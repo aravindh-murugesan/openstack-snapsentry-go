@@ -106,3 +106,22 @@ func helperNormalizeDay(dayStr string) (time.Weekday, error) {
 		return 0, fmt.Errorf("invalid day '%s'", dayStr)
 	}
 }
+
+// helperGetMonthlyDate safely constructs a date for a specific day of the month.
+// It handles months with fewer days by clamping to the last valid day.
+// Example: asking for Feb 30th returns Feb 28th (or 29th in leap years).
+func helperGetMonthlyDate(year int, month time.Month, targetDay, hour, min int, loc *time.Location) time.Time {
+	// Start with the 1st of the target month
+	firstOfMonth := time.Date(year, month, 1, hour, min, 0, 0, loc)
+
+	// Find the last day of this month
+	lastOfMonth := firstOfMonth.AddDate(0, 1, -1)
+
+	// Clamp: If targetDay (e.g. 31) > lastDay (e.g. 28), use lastDay.
+	actualDay := targetDay
+	if actualDay > lastOfMonth.Day() {
+		actualDay = lastOfMonth.Day()
+	}
+
+	return time.Date(year, month, actualDay, hour, min, 0, 0, loc)
+}
