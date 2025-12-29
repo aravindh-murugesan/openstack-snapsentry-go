@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/policy"
 	"github.com/gophercloud/gophercloud/v2/openstack/blockstorage/v3/snapshots"
 )
 
@@ -99,4 +100,119 @@ func (c *Client) DeleteSnapshot(ctx context.Context, snapshotID string) (Request
 	}
 
 	return requestID, nil
+}
+
+// ListManagedVolumeSnapshots fetches the snapshot history for a specific volume, filtered by policy type.
+//
+// Parameters:
+//   - volumeID: The UUID of the volume to inspect.
+//   - policyType: The policy identifier to filter by (e.g., "daily", "weekly").
+//   - lastSnapshotOnly: Optimization flag. If true, the function stops after finding the
+//     first match. This is used during the "Evaluate" phase to quickly find the most
+//     recent snapshot for idempotency checks.
+//
+// Note: This relies on the OpenStack API returning snapshots sorted by creation date (Newest First),
+// which is the default behavior for Cinder.
+func (c *Client) ListManagedVolumeSnapshots(ctx context.Context, volumeID string, policyType string, lastSnapshotOnly bool) (
+	ManagedSnapshots []snapshots.Snapshot, Error error,
+) {
+	// TODO (aravindh-murugesan): Refactor this method with a helper func to reduce code duplication with ListManagedSnapshots.
+	var managedSnapshots []snapshots.Snapshot
+
+	listOperation := func(innerCtx context.Context) error {
+		// Reset the slice on retry to avoid duplicates
+		managedSnapshots = []snapshots.Snapshot{}
+
+		// Constuct opts to list all the snapshot
+		opts := snapshots.ListOpts{
+			AllTenants: false,
+			Status:     "available",
+			VolumeID:   volumeID,
+		}
+
+		pages, err := snapshots.List(c.BlockStorageClient, opts).AllPages(innerCtx)
+		if err != nil {
+			return err
+		}
+		snaps, err := snapshots.ExtractSnapshots(pages)
+		if err != nil {
+			return err
+		}
+
+		// Filter by Metadata Policy Type
+		for _, snap := range snaps {
+			metadata := policy.SnapshotMetadata{}
+			// We ignore errors here; if metadata is missing/malformed, it's simply not a managed snapshot.
+			_ = metadata.ParseFromMetadata(snap.Metadata)
+
+			if metadata.PolicyType == policyType {
+				managedSnapshots = append(managedSnapshots, snap)
+
+				// Optimization: Relying on API default sort order.
+				if lastSnapshotOnly {
+					return nil
+				}
+			}
+		}
+
+		return nil
+	}
+
+	if err := c.executeWithRetry(ctx, "ListManagedSnapshots", listOperation); err != nil {
+		return []snapshots.Snapshot{}, err
+	}
+
+	return managedSnapshots, nil
+}
+
+// ListManagedSnapshots retrieves every snapshot in the project that is managed by SnapSentry.
+// This is primarily used by the Expiry/Cleanup workflow to find candidates for deletion.
+//
+// Filtering:
+// Since OpenStack API filtering is limited for custom metadata keys, this method performs
+// "Client-Side Filtering": it fetches all 'available' snapshots and iterates through them,
+// parsing the metadata to find those with the 'x-snapsentry-managed' tag set to true.
+func (c *Client) ListManagedSnapshots(ctx context.Context) (
+	ManagedSnapshots []snapshots.Snapshot, Error error,
+) {
+	// TODO (aravindh-murugesan): Refactor this method with a helper func to reduce code duplication with ListManagedVolumeSnapshots.
+	var managedSnapshots []snapshots.Snapshot
+
+	listOperation := func(innerCtx context.Context) error {
+		// Reset the slice on retry to avoid duplicates
+		managedSnapshots = []snapshots.Snapshot{}
+
+		// Constuct opts to list all the snapshot
+		opts := snapshots.ListOpts{
+			AllTenants: false,
+			Status:     "available",
+		}
+
+		pages, err := snapshots.List(c.BlockStorageClient, opts).AllPages(innerCtx)
+		if err != nil {
+			return err
+		}
+		snaps, err := snapshots.ExtractSnapshots(pages)
+		if err != nil {
+			return err
+		}
+
+		// Filter by Metadata Policy Type
+		for _, snap := range snaps {
+			metadata := policy.SnapshotMetadata{}
+			// We ignore errors here; if metadata is missing/malformed, it's simply not a managed snapshot.
+			_ = metadata.ParseFromMetadata(snap.Metadata)
+
+			if metadata.Managed {
+				managedSnapshots = append(managedSnapshots, snap)
+			}
+		}
+		return nil
+	}
+
+	if err := c.executeWithRetry(ctx, "ListManagedSnapshots", listOperation); err != nil {
+		return []snapshots.Snapshot{}, err
+	}
+
+	return managedSnapshots, nil
 }
