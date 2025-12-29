@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"fmt"
+
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 )
@@ -13,7 +15,21 @@ var (
 var rootCommand = &cobra.Command{
 	Use:     "snapsentry-go",
 	Aliases: []string{"snapsentry"},
-	Short:   "SnapSentry: OpenStack Snapshot Lifecycle Manager",
+	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		// 1. Allow 'version' (and 'help') to run without the flag
+		if cmd.Name() == "version" || cmd.Name() == "help" {
+			return nil
+		}
+
+		// 2. Manually enforce the flag for all other commands
+		// Assuming 'cloudProfile' is the variable bound to your flag
+		if cloudProfile == "" {
+			return fmt.Errorf("required flag(s) \"cloud\" not set")
+		}
+
+		return nil
+	},
+	Short: "SnapSentry: OpenStack Snapshot Lifecycle Manager",
 	Long: `SnapSentry is a policy-based snapshot scheduler for OpenStack volumes.
 It allows you to define Daily, Weekly, and Monthly snapshot policies via volume metadata
 and automatically manages the lifecycle (creation and expiry) of those snapshots.
@@ -40,7 +56,5 @@ func init() {
 
 	viper.SetEnvPrefix("SNAPSENTRY")
 	viper.AutomaticEnv()
-
-	_ = rootCommand.MarkPersistentFlagRequired("cloud")
 
 }
