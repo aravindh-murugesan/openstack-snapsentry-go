@@ -125,3 +125,78 @@ func helperGetMonthlyDate(year int, month time.Month, targetDay, hour, min int, 
 
 	return time.Date(year, month, actualDay, hour, min, 0, 0, loc)
 }
+
+// helperEvaluateWindow determines if the current time falls within a valid snapshot window
+// and checks if a snapshot has already been taken for that window.
+//
+// Parameters:
+//   - now: The current time (localized).
+//   - potentialStart: The calculated start time of the window *for the current cycle* (e.g., Today at 14:00).
+//   - duration: The length of the window (e.g., 24h for Daily, 7d for Weekly).
+//   - lastSnapshot: Information about the most recent successful snapshot.
+func helperEvaluateWindow(
+	now time.Time, potentialStart time.Time, duration time.Duration, lastSnapshot LastSnapshotInfo) PolicyEvalResult {
+
+	result := PolicyEvalResult{
+		ShouldSnapshot: false,
+		Metadata:       SnapshotMetadata{}, // Caller will fill this if successful
+		Window:         SnapshotPolicyWindow{},
+	}
+
+	// 1. Determine Window Bounds
+	// If "Now" is before the "Potential Start", it means we haven't reached this cycle's start time yet.
+	// Therefore, the *active* window is actually the previous cycle's window.
+	// Example: Policy is Daily 14:00. Now is 10:00.
+	// Potential Start = Today 14:00. Now < Potential.
+	// Active Window Start = Yesterday 14:00.
+	if now.Before(potentialStart) {
+		result.Window.StartTime = potentialStart.Add(-duration)
+	} else {
+		result.Window.StartTime = potentialStart
+	}
+
+	result.Window.EndTime = result.Window.StartTime.Add(duration)
+	result.Window.ValidatedTime = now
+
+	// 2. Strict Range Check
+	// Verify that 'now' is physically inside [Start, End).
+	isInside := (now.Equal(result.Window.StartTime) || now.After(result.Window.StartTime)) &&
+		now.Before(result.Window.EndTime)
+
+	if !isInside {
+		result.ShouldSnapshot = false
+		result.Reason = fmt.Sprintf("Current time %s is outside the active window (%s - %s)",
+			now.Format("2006-01-02 15:04"),
+			result.Window.StartTime.Format("2006-01-02 15:04"),
+			result.Window.EndTime.Format("2006-01-02 15:04"))
+		return result
+	}
+
+	// 3. Idempotency Check
+	// Check if a snapshot already exists within this calculated window.
+	hasSnapshot := false
+	if !lastSnapshot.CreatedAt.IsZero() {
+		snapTime := lastSnapshot.CreatedAt
+
+		// We use strict comparison logic here.
+		// A snapshot matches if: WindowStart <= SnapshotTime < WindowEnd
+		inWindow := (snapTime.Equal(result.Window.StartTime) || snapTime.After(result.Window.StartTime)) &&
+			snapTime.Before(result.Window.EndTime)
+
+		if inWindow {
+			hasSnapshot = true
+		}
+	}
+
+	if hasSnapshot {
+		result.ShouldSnapshot = false
+		result.Reason = fmt.Sprintf("Snapshot already exists in active window (ID: %s created at %s)",
+			lastSnapshot.ID, lastSnapshot.CreatedAt.Format("2006-01-02 15:04"))
+		return result // Stop: Idempotency check failed
+	}
+
+	// 4. Success Signal
+	result.ShouldSnapshot = true
+	result.Reason = "Snapshot Window is active and no existing snapshot found."
+	return result // Proceed
+}
