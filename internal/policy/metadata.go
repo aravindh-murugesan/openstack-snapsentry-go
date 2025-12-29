@@ -46,3 +46,14 @@ func (s SnapshotMetadata) ToOpenstackMetadata() map[string]string {
 		"x-snapsentry-snapshot-retention-days":      strconv.Itoa(s.RetentionDays),
 	}
 }
+
+// ParseFromMetadata hydrates the SnapshotMetadata struct from a raw OpenStack metadata map.
+// It uses the shared generic parser to handle type conversion (string -> bool/int/time).
+func (s *SnapshotMetadata) ParseFromMetadata(metadata map[string]string) error {
+	parsed, err := ParseSnapSentryMetadataFromSDK[SnapshotMetadata](metadata)
+	if err != nil {
+		return err
+	}
+	*s = *parsed
+	return nil
+}
