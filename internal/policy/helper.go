@@ -78,3 +78,31 @@ func helperNormalizeStartTime(startTime string) (time.Time, error) {
 
 	return time.Time{}, fmt.Errorf("invalid start time '%s'; must be HH:MM or HH:MM:SS", startTime)
 }
+
+// helperNormalizeDay converts various string representations of a weekday into a time.Weekday.
+// It supports full names ("Monday"), short names ("Mon"), and numeric strings ("1").
+func helperNormalizeDay(dayStr string) (time.Weekday, error) {
+
+	if dayStr == "" {
+		dayStr = "sunday"
+	}
+
+	switch dayStr {
+	case "Sunday", "Sun", "sun", "sunday", "0":
+		return time.Sunday, nil
+	case "Monday", "Mon", "mon", "monday", "1":
+		return time.Monday, nil
+	case "Tuesday", "Tue", "tue", "tuesday", "2":
+		return time.Tuesday, nil
+	case "Wednesday", "Wed", "wed", "wednesday", "3":
+		return time.Wednesday, nil
+	case "Thursday", "Thu", "thu", "thursday", "4":
+		return time.Thursday, nil
+	case "Friday", "Fri", "fri", "friday", "5":
+		return time.Friday, nil
+	case "Saturday", "Sat", "sat", "saturday", "6":
+		return time.Saturday, nil
+	default:
+		return 0, fmt.Errorf("invalid day '%s'", dayStr)
+	}
+}
