@@ -47,3 +47,12 @@ func helperNormalizeTimezone(timezone string) (string, *time.Location, error) {
 	}
 	return timezone, loc, nil
 }
+
+// helperNormalizeRetentionDays ensures the retention period is valid.
+// If the provided days are <= 0, it falls back to the specified default.
+func helperNormalizeRetentionDays(days int, defaultDays int) int {
+	if days <= 0 {
+		return defaultDays
+	}
+	return days
+}
