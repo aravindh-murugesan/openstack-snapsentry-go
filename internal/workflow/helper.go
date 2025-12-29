@@ -1,8 +1,10 @@
 package workflow
 
 import (
+	"fmt"
 	"log/slog"
 	"os"
+	"time"
 
 	"github.com/lmittmann/tint"
 )
@@ -27,4 +29,12 @@ func setupLogger(level string, cloudName string) *slog.Logger {
 	})
 
 	return slog.New(handler).With("cloud_profile", cloudName)
+}
+
+// GenerateSnapshotName creates a consistent naming convention for snapshots.
+// Format: managed-<policyType>-<volumeID>-<windowStart>
+func generateSnapshotName(policyType string, windowStart time.Time, volumeID string) string {
+	// Using a concise time format for the name to avoid illegal characters
+	timestamp := windowStart.Format(time.RFC3339)
+	return fmt.Sprintf("managed-%s-%s-%s", policyType, volumeID, timestamp)
 }
