@@ -39,7 +39,7 @@ func (s SnapshotMetadata) ToOpenstackMetadata() map[string]string {
 	}
 
 	return map[string]string{
-		"x-snapsentry-snapshot-managed":             strconv.FormatBool(s.Managed),
+		"x-snapsentry-managed":                      strconv.FormatBool(s.Managed),
 		"x-snapsentry-snapshot-expiry-date":         expiryDateStr,
 		"x-snapsentry-snapshot-expiry-date-user-tz": expiryDateStrTZ,
 		"x-snapsentry-snapshot-policy-type":         s.PolicyType,
