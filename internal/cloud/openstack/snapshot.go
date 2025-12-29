@@ -68,3 +68,35 @@ func (c *Client) CreateManagedSnapshot(
 
 	return createdSnapshot, requestID, nil
 }
+
+// DeleteSnapshot removes a snapshot from the backend storage.
+//
+// Behavior:
+//   - Force Delete: This method explicitly triggers a "Force Delete" operation.
+//     This ensures the snapshot is removed even if the storage backend indicates
+//     it is busy or in a stuck state, preventing "zombie" snapshots from accumulating.
+//   - Asynchronous: Unlike creation, deletion is often asynchronous. This method returns
+//     success once the delete request is accepted by the API, but does not wait for
+//     the resource to disappear completely.
+//
+// Returns:
+//   - RequestID: The OpenStack tracing ID for the delete operation.
+//   - Error: Returns an error if the delete request fails (e.g., 404 Not Found or 403 Forbidden).
+func (c *Client) DeleteSnapshot(ctx context.Context, snapshotID string) (RequestID string, Error error) {
+	var requestID string
+	deleteOperation := func(innerCtx context.Context) error {
+		result := snapshots.ForceDelete(innerCtx, c.BlockStorageClient, snapshotID)
+		requestID = result.Header.Get("X-Openstack-Request-Id")
+
+		if result.Err != nil {
+			return result.Err
+		}
+		return nil
+	}
+
+	if err := c.executeWithRetry(ctx, "DeleteVolumeSnapshot", deleteOperation); err != nil {
+		return requestID, err
+	}
+
+	return requestID, nil
+}
