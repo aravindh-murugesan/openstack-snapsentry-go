@@ -11,7 +11,7 @@ import (
 
 // setupLogger configures the application-wide logger.
 // It uses "tint" for colorized, structured logging that is easy to read in terminals.
-func setupLogger(level string, cloudName string) *slog.Logger {
+func SetupLogger(level string, cloudName string) *slog.Logger {
 	var logLevel slog.Level
 	switch level {
 	case "debug":

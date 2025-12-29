@@ -29,7 +29,7 @@ func initClient(cloudName string, logLevel string) (*openstack.Client, error) {
 
 // SubscribeVolumeDaily configures the Daily policy on a volume.
 func SubscribeVolumeDaily(cloudName, logLevel, volID string, enabled bool, retention int, start, tz string) error {
-	logger := setupLogger(logLevel, cloudName).With("workflow", "subscribe-daily", "volume_id", volID)
+	logger := SetupLogger(logLevel, cloudName).With("workflow", "subscribe-daily", "volume_id", volID)
 
 	p := policy.SnapshotPolicyDaily{
 		Enabled:       enabled,
@@ -49,7 +49,7 @@ func SubscribeVolumeDaily(cloudName, logLevel, volID string, enabled bool, reten
 
 // SubscribeVolumeWeekly configures the Weekly policy on a volume.
 func SubscribeVolumeWeekly(cloudName, logLevel, volID string, enabled bool, retention int, start, tz, weekday string) error {
-	logger := setupLogger(logLevel, cloudName).With("workflow", "subscribe-weekly", "volume_id", volID)
+	logger := SetupLogger(logLevel, cloudName).With("workflow", "subscribe-weekly", "volume_id", volID)
 
 	p := policy.SnapshotPolicyWeekly{
 		Enabled:       enabled,
@@ -70,7 +70,7 @@ func SubscribeVolumeWeekly(cloudName, logLevel, volID string, enabled bool, rete
 
 // SubscribeVolumeMonthly configures the Monthly policy on a volume.
 func SubscribeVolumeMonthly(cloudName, logLevel, volID string, enabled bool, retention int, start, tz string, day int) error {
-	logger := setupLogger(logLevel, cloudName).With("workflow", "subscribe-monthly", "volume_id", volID)
+	logger := SetupLogger(logLevel, cloudName).With("workflow", "subscribe-monthly", "volume_id", volID)
 
 	p := policy.SnapshotPolicyMonthly{
 		Enabled:       enabled,

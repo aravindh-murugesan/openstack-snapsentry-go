@@ -24,7 +24,7 @@ import (
 //   - now: The reference time for expiry (usually time.Now(), but injected for deterministic testing. UTC).
 func RunProjectSnapshotExpiryWorkflow(cloudName string, timeoutSeconds int, logLevel string, now time.Time) error {
 	// 1. Setup Logger & Context
-	logger := setupLogger(logLevel, cloudName).With("workflow", "expiry", "validation_time", now)
+	logger := SetupLogger(logLevel, cloudName).With("workflow", "expiry", "validation_time", now)
 	logger.Info("Initializing snapshot lifecycle workflow - expiry")
 
 	ctx := context.Background()

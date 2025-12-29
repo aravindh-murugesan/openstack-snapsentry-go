@@ -28,7 +28,7 @@ import (
 func RunProjectSnapshotWorkflow(cloudName string, timeoutSeconds int, logLevel string) error {
 	// 1. Initialize Structured Logger
 	// We use slog with tint for colorized, human-readable logs in development/CLI usage.
-	logger := setupLogger(logLevel, cloudName)
+	logger := SetupLogger(logLevel, cloudName)
 
 	logger.Info("Initializing snapshot lifecycle workflow")
 
