@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"fmt"
+
 	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/workflow"
 	"github.com/spf13/cobra"
 )
@@ -28,6 +30,7 @@ var subscribeDailyCommand = &cobra.Command{
 	Short: "Applies a daily snapshot schedule",
 	Long:  `Configures the target volume with a daily snapshot policy. This command updates the volume's metadata to enable daily backups, setting the specific retention period (in days) and the precise time of day (HH:MM) for the snapshot trigger.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Println(headerStyle.Render("Snapsentry - Daily Subscription"))
 		return workflow.SubscribeVolumeDaily(
 			cloudProfile, logLevel, volumeID, enablePolicy, retentionDays, startTime, timeZone,
 		)
@@ -39,6 +42,7 @@ var subscribeWeeklyCmd = &cobra.Command{
 	Short: "Applies a weekly snapshot schedule",
 	Long:  `Configures the target volume with a weekly snapshot policy. This command updates the volume's metadata to enable weekly backups, allowing you to specify the exact day of the week (e.g., "Sunday"), the retention period, and the execution time.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Println(headerStyle.Render("Snapsentry - Weekly Subscription"))
 		return workflow.SubscribeVolumeWeekly(
 			cloudProfile, logLevel, volumeID, enablePolicy, retentionDays, startTime, timeZone, weekDay,
 		)
@@ -50,6 +54,7 @@ var subscribeMonthlyCmd = &cobra.Command{
 	Short: "Applies a monthly snapshot schedule",
 	Long:  `Configures the target volume with a monthly snapshot policy. This command updates the volume's metadata to enable monthly backups, allowing you to specify the calendar day (1-31) for execution, along with the retention period and start time.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		fmt.Println(headerStyle.Render("Snapsentry - Monthly Subscription"))
 		return workflow.SubscribeVolumeMonthly(
 			cloudProfile, logLevel, volumeID, enablePolicy, retentionDays, startTime, timeZone, dayOfMonth,
 		)
