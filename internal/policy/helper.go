@@ -1,6 +1,7 @@
 package policy
 
 import (
+	"fmt"
 	"time"
 
 	"github.com/go-viper/mapstructure/v2"
@@ -31,4 +32,18 @@ func ParseSnapSentryMetadataFromSDK[T any](metadata map[string]string) (*T, erro
 	}
 
 	return &result, nil
+}
+
+// helperNormalizeTimezone loads a Time Location from a string name.
+// It defaults to UTC if the timezone string is empty.
+func helperNormalizeTimezone(timezone string) (string, *time.Location, error) {
+	if timezone == "" {
+		timezone = "UTC"
+	}
+
+	loc, err := time.LoadLocation(timezone)
+	if err != nil {
+		return timezone, nil, fmt.Errorf("invalid timezone '%s': %w", timezone, err)
+	}
+	return timezone, loc, nil
 }
