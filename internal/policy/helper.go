@@ -56,3 +56,25 @@ func helperNormalizeRetentionDays(days int, defaultDays int) int {
 	}
 	return days
 }
+
+// helperNormalizeStartTime parses a time string in "HH:MM" or "HH:MM:SS" format.
+// It defaults to "00:00:00" if the input is empty.
+func helperNormalizeStartTime(startTime string) (time.Time, error) {
+	if startTime == "" {
+		startTime = "00:00:00"
+	}
+
+	// Try parsing short format (HH:MM)
+	t, err := time.Parse("15:04", startTime)
+	if err == nil {
+		return t, nil
+	}
+
+	// Try parsing long format (HH:MM:SS)
+	t, err = time.Parse(time.TimeOnly, startTime)
+	if err == nil {
+		return t, nil
+	}
+
+	return time.Time{}, fmt.Errorf("invalid start time '%s'; must be HH:MM or HH:MM:SS", startTime)
+}
