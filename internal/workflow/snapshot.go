@@ -9,6 +9,7 @@ import (
 	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/cloud"
 	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/cloud/openstack"
 	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/policy"
+	"github.com/gofrs/uuid/v5"
 	"github.com/gophercloud/gophercloud/v2/openstack/blockstorage/v3/volumes"
 )
 
@@ -30,6 +31,16 @@ func RunProjectSnapshotWorkflow(cloudName string, timeoutSeconds int, logLevel s
 	// We use slog with tint for colorized, human-readable logs in development/CLI usage.
 	logger := SetupLogger(logLevel, cloudName)
 
+	uuidObj, err := uuid.NewV4()
+	var snapsentryRunID string
+
+	if err != nil {
+		logger.Warn("Unable to generate a unique workflow id", "err", err)
+		snapsentryRunID = "unknown-id"
+	} else {
+		snapsentryRunID = uuidObj.String()
+	}
+	logger = logger.With("snapsentry_id", snapsentryRunID)
 	logger.Info("Initializing snapshot lifecycle workflow")
 
 	// 2. Setup Context (Optional Timeout)
