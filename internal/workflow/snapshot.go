@@ -123,6 +123,7 @@ func RunProjectSnapshotWorkflow(cloudName string, timeoutSeconds int, logLevel s
 func processVolume(ctx context.Context, client *openstack.Client, vol volumes.Volume, logger *slog.Logger) error {
 	// Define the order of policy evaluation.
 	policies := []policy.SnapshotPolicy{
+		&policy.SnapshotPolicyExpress{},
 		&policy.SnapshotPolicyDaily{},
 		&policy.SnapshotPolicyWeekly{},
 		&policy.SnapshotPolicyMonthly{},
