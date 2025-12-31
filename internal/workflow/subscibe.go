@@ -28,6 +28,26 @@ func initClient(cloudName string, logLevel string) (*openstack.Client, error) {
 }
 
 // SubscribeVolumeDaily configures the Daily policy on a volume.
+func SubscribeVolumeExpress(cloudName, logLevel, volID string, enabled bool, retention int, tz string, interval int) error {
+	logger := SetupLogger(logLevel, cloudName).With("workflow", "subscribe-daily", "volume_id", volID)
+
+	p := policy.SnapshotPolicyExpress{
+		Enabled:       enabled,
+		RetentionDays: retention,
+		RetentionType: "time",
+		IntervalHours: interval,
+		TimeZone:      tz,
+	}
+
+	if err := p.Normalize(); err != nil {
+		logger.Error("Invalid policy configuration", "error", err)
+		return err
+	}
+
+	return applySubscription(cloudName, logLevel, volID, p.ToOpenstackMetadata(), logger)
+}
+
+// SubscribeVolumeDaily configures the Daily policy on a volume.
 func SubscribeVolumeDaily(cloudName, logLevel, volID string, enabled bool, retention int, start, tz string) error {
 	logger := SetupLogger(logLevel, cloudName).With("workflow", "subscribe-daily", "volume_id", volID)
 
