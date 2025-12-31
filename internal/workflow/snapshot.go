@@ -197,6 +197,7 @@ func processVolume(ctx context.Context, client *openstack.Client, vol volumes.Vo
 		// D. Execute
 		policyLogger.Info("Snapshot window active; initiating creation",
 			"window_start", result.Window.StartTime,
+			"window_end", result.Window.EndTime,
 			"reason", result.Reason)
 
 		snapName := generateSnapshotName(policyType, result.Window.StartTime, vol.ID)
