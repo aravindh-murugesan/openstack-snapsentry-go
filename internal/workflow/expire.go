@@ -9,7 +9,7 @@ import (
 	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/cloud"
 	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/cloud/openstack"
 	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/policy"
-	"github.com/gofrs/uuid/v5"
+	"github.com/google/uuid"
 	"github.com/gophercloud/gophercloud/v2/openstack/blockstorage/v3/snapshots"
 )
 
@@ -26,15 +26,7 @@ import (
 func RunProjectSnapshotExpiryWorkflow(cloudName string, timeoutSeconds int, logLevel string, now time.Time) error {
 	// 1. Setup Logger & Context
 	logger := SetupLogger(logLevel, cloudName).With("workflow", "expiry", "validation_time", now)
-	uuidObj, err := uuid.NewV4()
-	var snapsentryRunID string
-
-	if err != nil {
-		logger.Warn("Unable to generate a unique workflow id", "err", err)
-		snapsentryRunID = "unknown-id"
-	} else {
-		snapsentryRunID = fmt.Sprintf("req-%s", uuidObj.String())
-	}
+	snapsentryRunID := fmt.Sprintf("req-%s", uuid.New().String())
 	logger = logger.With("snapsentry_id", snapsentryRunID)
 
 	logger.Info("Initializing snapshot lifecycle workflow - expiry")
