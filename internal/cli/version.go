@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	version, commit, date string
+	SnapsentryVersion, SnapsentryCommit, SnapsentryDate string
 )
 
 var versionCommand = &cobra.Command{
@@ -15,9 +15,9 @@ var versionCommand = &cobra.Command{
 	Short: "Print version information",
 	Long:  "Display version, commit hash, build date, and other build information",
 	Run: func(cmd *cobra.Command, args []string) {
-		fmt.Printf("SnapSentry version: %s\n", version)
-		fmt.Printf("Commit: %s\n", commit)
-		fmt.Printf("Built: %s\n", date)
+		fmt.Printf("SnapSentry version: %s\n", SnapsentryVersion)
+		fmt.Printf("Commit: %s\n", SnapsentryCommit)
+		fmt.Printf("Built: %s\n", SnapsentryDate)
 	},
 }
 
