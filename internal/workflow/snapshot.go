@@ -2,8 +2,11 @@ package workflow
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/cloud"
@@ -78,40 +81,97 @@ func RunProjectSnapshotWorkflow(cloudName string, timeoutSeconds int, logLevel s
 
 	// 5. Process Volumes Sequentially
 	// We process volumes one by one rather than in parallel to avoid hitting OpenStack API rate limits.
-	successCount := 0
-	errorCount := 0
+	var successCount int32
+	var errorCount int32
 
-	for i, vol := range managedVolumes {
-		// Fail-safe: Check for global cancellation/timeout between volumes.
-		if ctx.Err() != nil {
-			logger.Warn("Workflow execution halted due to timeout or cancellation")
-			return ctx.Err()
-		}
+	groupedVolumes := ostk.GroupVolumeByVMAttachment(managedVolumes)
 
-		// Create a context-aware logger for this specific volume to trace logs easily.
-		volLogger := logger.With(
-			"volume_id", vol.ID,
-			"volume_name", vol.Name,
-			"progress", fmt.Sprintf("%d/%d", i+1, len(managedVolumes)),
-		)
-
-		volLogger.Debug("Starting processing for volume")
-
-		if err := processVolume(ctx, &ostk, vol, volLogger); err != nil {
-			volLogger.Error("Volume processing encountered an error", "error", err)
-			errorCount++
-		} else {
-			volLogger.Debug("Volume processing completed successfully")
-			successCount++
-		}
+	logger.Debug("Starting to process single-attached volumes", "vm_count", len(groupedVolumes.Attached))
+	for vm, vols := range groupedVolumes.Attached {
+		logger.Debug("Starting to process volumes attached to a VM", "vm_id", vm, "volume_count", len(vols))
+		processVolumeGroup(ctx, &ostk, vols, &successCount, &errorCount, logger)
 	}
 
-	logger.Info("Snapshot workflow execution summary",
+	logger.Debug("Starting to process multi-attached volumes", "count", len(groupedVolumes.MultiAttached))
+	for _, vol := range groupedVolumes.MultiAttached {
+		processVolumeGroup(ctx, &ostk, []volumes.Volume{vol}, &successCount, &errorCount, logger)
+	}
+
+	logger.Debug("Starting to process unattached volumes", "count", len(groupedVolumes.Unattached))
+	for _, vol := range groupedVolumes.Unattached {
+		processVolumeGroup(ctx, &ostk, []volumes.Volume{vol}, &successCount, &errorCount, logger)
+	}
+
+	logger.Info("Snapshot workflow execution summary for evaluation. This only refers to snapsentry processing and excludes openstack api errors",
 		"volumes_processed", len(managedVolumes),
 		"success_count", successCount,
 		"error_count", errorCount)
 
 	return nil
+}
+
+// processVolumeGroup executes snapshot logic for a list of volumes concurrently.
+// This is a wrapper for processVolume for concurrency.
+// Design Rationale:
+//   - Purpose: Minimizes the time skew between snapshots for multi-disk VMs (simulated atomicity).
+//   - Concurrency: Spins up one goroutine per volume. Uses sync.WaitGroup to block until all complete.
+//   - Safety: Checks ctx.Err() before starting new goroutines to respect global timeouts immediately.
+//   - Metrics: Uses atomic operations to safely update shared counters from multiple threads.
+//
+// Parameters:
+//   - ctx: Global context (handles timeout/cancellation).
+//   - client: Authenticated OpenStack client.
+//   - vols: Slice of volumes to process (usually belonging to the same VM).
+//   - success/errorCounter: Pointers to thread-safe counters.
+//   - logger: Base logger (fields like 'vm_id' should already be attached).
+func processVolumeGroup(
+	ctx context.Context,
+	client *openstack.Client,
+	vols []volumes.Volume,
+	successCounter *int32,
+	errorCounter *int32,
+	logger *slog.Logger,
+) {
+
+	var vgWaitGroup sync.WaitGroup
+
+	for _, v := range vols {
+
+		// Fail-safe: Check context BEFORE spawning a new goroutine.
+		// If the global timeout is hit, stop starting new work immediately.
+		if ctx.Err() != nil {
+			logger.Error("Workflow execution halted due to timeout or cancellation")
+			break // (TO SELF) ensures active goroutines are awaited
+		}
+
+		vgWaitGroup.Add(1)
+
+		// Each volume gets its own go-routine.
+		go func(ctx context.Context, client *openstack.Client, vol volumes.Volume, logger *slog.Logger) {
+			defer vgWaitGroup.Done()
+
+			// logger specific to this volume for clear traceability.
+			volLogger := logger.With(
+				"volume_id", vol.ID,
+				"volume_name", vol.Name,
+			)
+
+			volLogger.Debug("Starting processing for volume")
+
+			// Execute the core logic (policy checks, snapshot creation, etc.)
+			if err := processVolume(ctx, client, vol, volLogger); err != nil {
+				volLogger.Error("Volume processing encountered an error", "error", err)
+				// Atomic increment is required because multiple goroutines write to this address simultaneously.
+				atomic.AddInt32(errorCounter, 1)
+			} else {
+				volLogger.Debug("Volume processing completed successfully")
+				// Atomic increment is required because multiple goroutines write to this address simultaneously.
+				atomic.AddInt32(successCounter, 1)
+			}
+		}(ctx, client, v, logger)
+	}
+
+	vgWaitGroup.Wait()
 }
 
 // processVolume applies the business logic to a single volume.
@@ -124,6 +184,8 @@ func RunProjectSnapshotWorkflow(cloudName string, timeoutSeconds int, logLevel s
 //  5. Auditing: Writes detailed logs (Skipped/Created/Failed) to the database.
 //  6. Cleanup: Detects and deletes "zombie" snapshots if creation reports failure but leaves an ID behind.
 func processVolume(ctx context.Context, client *openstack.Client, vol volumes.Volume, logger *slog.Logger) error {
+
+	var execErrors error
 	// Define the order of policy evaluation.
 	policies := []policy.SnapshotPolicy{
 		&policy.SnapshotPolicyExpress{},
@@ -149,6 +211,7 @@ func processVolume(ctx context.Context, client *openstack.Client, vol volumes.Vo
 			// If a policy is unconfigured or disabled, Normalize returns an error.
 			// This is normal behavior for optional policies, so we just log debug and skip.
 			policyLogger.Debug("Policy configuration skipped or invalid", "err", err)
+			execErrors = errors.Join(execErrors, fmt.Errorf("%s policy configuration is invalid or skipped. %w", policyType, err))
 			continue
 		}
 
@@ -162,6 +225,7 @@ func processVolume(ctx context.Context, client *openstack.Client, vol volumes.Vo
 		snapshots, err := client.ListManagedVolumeSnapshots(ctx, vol.ID, policyType, true)
 		if err != nil {
 			policyLogger.Error("Snapshot history retrieval failed", "error", err)
+			execErrors = errors.Join(execErrors, fmt.Errorf("%s policy snapshot history retrieval failed. %w", policyType, err))
 			continue
 		}
 
@@ -186,6 +250,7 @@ func processVolume(ctx context.Context, client *openstack.Client, vol volumes.Vo
 		result, err := p.Evaluate(time.Now(), lastSnapshotInfo)
 		if err != nil {
 			policyLogger.Error("Policy evaluation failed", "error", err)
+			execErrors = errors.Join(execErrors, fmt.Errorf("%s policy evaluation failed. %w", policyType, err))
 			continue
 		}
 
@@ -218,6 +283,7 @@ func processVolume(ctx context.Context, client *openstack.Client, vol volumes.Vo
 			continue
 		} else {
 			// Failure path
+			execErrors = errors.Join(execErrors, fmt.Errorf("%s policy snapshot resource creation failed. %w", policyType, err))
 			policyLogger.Error("Snapshot resource creation failed",
 				"error", err,
 				"request_id", reqID,
@@ -235,6 +301,7 @@ func processVolume(ctx context.Context, client *openstack.Client, vol volumes.Vo
 
 				if cleanupErr != nil {
 					// CRITICAL: We failed to create it AND failed to delete the zombie resource.
+					execErrors = errors.Join(execErrors, fmt.Errorf("%s policy orphaned snapshot cleanup failed; manual intervention required. %w", policyType, cleanupErr))
 					policyLogger.Error("Orphaned snapshot cleanup failed; manual intervention required",
 						"error", cleanupErr,
 						"snapshot_id", createdSnap.ID,
@@ -251,5 +318,5 @@ func processVolume(ctx context.Context, client *openstack.Client, vol volumes.Vo
 		}
 	}
 
-	return nil
+	return execErrors
 }
