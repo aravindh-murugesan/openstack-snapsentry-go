@@ -125,3 +125,26 @@ func (c *Client) ListSubscribedVolumes(ctx context.Context) (SubscribedVolumes [
 
 	return allVolumes, nil
 }
+
+func (c *Client) GroupVolumeByVMAttachment(volumeList []volumes.Volume) VMGroupedVolumeList {
+
+	result := VMGroupedVolumeList{
+		Attached:      make(map[string][]volumes.Volume),
+		MultiAttached: make([]volumes.Volume, 0),
+		Unattached:    make([]volumes.Volume, 0),
+	}
+
+	for _, v := range volumeList {
+		if len(v.Attachments) == 0 {
+			result.Unattached = append(result.Unattached, v)
+		} else if len(v.Attachments) > 1 {
+			result.MultiAttached = append(result.MultiAttached, v)
+		} else {
+			serverID := v.Attachments[0].ServerID
+			result.Attached[serverID] = append(result.Attached[serverID], v)
+		}
+	}
+
+	return result
+
+}
