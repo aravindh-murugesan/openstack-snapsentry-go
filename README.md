@@ -96,6 +96,17 @@ clouds:
     verify: true
 ```
 
+**4. UI Integration (Optional for administrators)**
+
+To enable a user-friendly configuration experience in the Horizon or Skyline dashboards (including dropdowns and validation), administrators can register the metadata definitions using the provided helper script.
+
+```bash
+bash scripts/glance-metadata-def.bash
+
+## If you have uvx
+bash glance-metadata-def.bash uvx
+```
+
 ## Usage
 
 You can run SnapSentry in Daemon Mode (standalone) or CLI Mode (for integration with external schedulers like Argo Workflows or Kubernetes CronJobs).
