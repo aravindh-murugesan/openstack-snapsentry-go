@@ -12,6 +12,7 @@ A robust, policy and metadata-driven snapshot management tool for OpenStack Cind
 * **Hybrid Concurrency:**
     * *Attached Volumes:* Processed concurrently for speed.
     * *Unattached/Shared Volumes:* Processed sequentially to prevent API throttling and ensure safety.
+* **Idempotency**: Ensure no duplicate snapshots are created for a specific snapshot window. 
 * **Self-Healing:** Built-in retry logic for transient OpenStack errors (HTTP 500s/Network issues) and automatic cleanup of orphaned "zombie" snapshots.
 
 ## Installation
