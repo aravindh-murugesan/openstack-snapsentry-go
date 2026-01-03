@@ -50,6 +50,11 @@ Save the following JSON to a file named access.json. This restricts snapsentry t
   {
     "service": "volumev3",
     "method": "POST",
+    "path": "/v3/{project_id}/snapshots"
+  },
+  {
+    "service": "volumev3",
+    "method": "POST",
     "path": "/v3/{project_id}/snapshots/**"
   },
   {
