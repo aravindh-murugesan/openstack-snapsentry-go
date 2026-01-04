@@ -11,6 +11,7 @@ import (
 
 	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/cloud"
 	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/cloud/openstack"
+	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/notifications"
 	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/policy"
 	"github.com/google/uuid"
 	"github.com/gophercloud/gophercloud/v2/openstack/blockstorage/v3/volumes"
@@ -163,6 +164,7 @@ func processVolumeGroup(
 				volLogger.Error("Volume processing encountered an error", "error", err)
 				// Atomic increment is required because multiple goroutines write to this address simultaneously.
 				atomic.AddInt32(errorCounter, 1)
+
 			} else {
 				volLogger.Debug("Volume processing completed successfully")
 				// Atomic increment is required because multiple goroutines write to this address simultaneously.
@@ -288,6 +290,19 @@ func processVolume(ctx context.Context, client *openstack.Client, vol volumes.Vo
 				"error", err,
 				"request_id", reqID,
 			)
+
+			ntfyprovider := notifications.Webhook{
+				URL: "https://cool-lion-02.webhook.cool",
+			}
+			if err := ntfyprovider.Notify(notifications.SnapshotCreationFailure{
+				Service:    "snapsentry",
+				VolumeID:   vol.ID,
+				SnapshotID: createdSnap.ID,
+				Message:    fmt.Sprintf("Volume processing encountered an error - %s", err),
+				Window:     result.Window,
+			}); err != nil {
+				slog.Error("Notification failed", "err", err)
+			}
 
 			// SAFETY CHECK: Orphaned Resource Cleanup
 			if createdSnap.ID != "" {
