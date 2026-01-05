@@ -121,22 +121,22 @@ You can run SnapSentry in Daemon Mode (standalone) or CLI Mode (for integration 
 Enable snapshot policies by setting specific metadata on your OpenStack volumes. We provide helper commands to make this easier.
 
 ```bash
-# Configure a Daily Policy (Keep 1 snapshot, taken at 08:00 IST)
+# Configure a Daily Policy (Keep snapshot for 1 day, taken at 08:00 IST)
 snapsentry-go --cloud snapsentry-bot subscribe daily \
   --start-time 08:00 --timezone "Asia/Kolkata" \
   --retention 1 --volume-id "<VOLUME-ID>"
 
-# Configure a Weekly Policy (Run on Sundays at 23:00 CET, keep 2)
+# Configure a Weekly Policy (Run on Sundays at 23:00 CET, keep snapshot for 2 days)
 snapsentry-go --cloud snapsentry-bot subscribe weekly \
   --timezone "Europe/Berlin" --start-time 23:00 \
   --retention 2 --week-day sunday --volume-id "<VOLUME-ID>"
 
-# Configure a Monthly Policy (Run on the 1st at 23:00 CET, keep 2)
+# Configure a Monthly Policy (Run on the 1st at 23:00 CET, keep snapshot for 2 days)
 snapsentry-go --cloud snapsentry-bot subscribe monthly \
   --timezone "Europe/Berlin" --start-time 23:00 \
   --retention 2 --month-day 1 --volume-id "<VOLUME-ID>"
 
-# Configure an Express Policy (Run every 6 hours)
+# Configure an Express Policy (Run every 6 hours, keep snapshot for 2 days)
 snapsentry-go --cloud snapsentry-bot subscribe express \
   --timezone "Europe/Berlin" --retention 2 \
   --interval-hours 6 --volume-id "<VOLUME-ID>"
