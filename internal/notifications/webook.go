@@ -8,7 +8,7 @@ import (
 	"time"
 )
 
-func (w *Webhook) Notify(notification SnapshotCreationFailure) error {
+func (w *Webhook) Notify(notification any) error {
 
 	payload, err := json.Marshal(notification)
 	if err != nil {
