@@ -8,6 +8,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/notifications"
 	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/workflow"
 	"github.com/go-co-op/gocron-ui/server"
 	"github.com/go-co-op/gocron/v2"
@@ -27,6 +28,12 @@ var daemonCommand = &cobra.Command{
 	Long:    `Starts Snapsentry as a background service that continuously manages snapshot creation and expiry based on configured policies.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println(headerStyle.Render("Snapsentry - Daemon Mode"))
+
+		webhookProvider := notifications.Webhook{
+			URL:      webhookURL,
+			Username: webhookUsername,
+			Password: webhookPassword,
+		}
 
 		dlog := workflow.SetupLogger(logLevel, cloudProfile).With("component", "daemon")
 
@@ -48,7 +55,7 @@ var daemonCommand = &cobra.Command{
 			),
 			gocron.NewTask(func() {
 				// A. Run the Workflow
-				workflow.RunProjectSnapshotWorkflow(cloudProfile, timeout, logLevel)
+				workflow.RunProjectSnapshotWorkflow(cloudProfile, timeout, webhookProvider, logLevel)
 
 				// B. Calculate and Log the Next Run (Post-Execution)
 				if snapshotJob != nil {
@@ -85,7 +92,7 @@ var daemonCommand = &cobra.Command{
 			),
 			gocron.NewTask(func() {
 				// A. Run the Workflow
-				workflow.RunProjectSnapshotExpiryWorkflow(cloudProfile, timeout, logLevel, time.Now().UTC())
+				workflow.RunProjectSnapshotExpiryWorkflow(cloudProfile, timeout, logLevel, time.Now().UTC(), webhookProvider)
 
 				// B. Calculate and Log the Next Run (Post-Execution)
 				if expireJob != nil {
