@@ -18,3 +18,11 @@ type SnapshotCreationFailure struct {
 	Message    string                      `json:"message"`
 	Window     policy.SnapshotPolicyWindow `json:"snapshot_window"`
 }
+
+type SnapshotExpiryFailure struct {
+	Service          string                  `json:"service"`
+	SnapshotID       string                  `json:"snapshot_id"`
+	VolumeID         string                  `json:"volume_id"`
+	SnapshotMetadata policy.SnapshotMetadata `json:"snapshot_metadata"`
+	Message          string                  `json:"message"`
+}
