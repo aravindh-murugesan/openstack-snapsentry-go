@@ -10,6 +10,9 @@ import (
 var (
 	cloudProfile, logLevel string
 	timeout                int
+	webhookURL             string
+	webhookUsername        string
+	webhookPassword        string
 )
 
 var rootCommand = &cobra.Command{
@@ -48,7 +51,9 @@ func init() {
 	rootCommand.PersistentFlags().StringVar(&cloudProfile, "cloud", "", "Name of the cloud profile as in clouds.yaml (required)")
 	rootCommand.PersistentFlags().IntVar(&timeout, "timeout", 0, "Global execution timeout in seconds (0 = run indefinitely)")
 	rootCommand.PersistentFlags().StringVar(&logLevel, "log-level", "info", "Logging level (debug, info, warn, error)")
-
+	rootCommand.PersistentFlags().StringVar(&webhookURL, "webhook-url", "", "Webhook URL for alerting")
+	rootCommand.PersistentFlags().StringVar(&webhookUsername, "webhook-username", "", "Webhook URL for alerting")
+	rootCommand.PersistentFlags().StringVar(&webhookPassword, "webhook-password", "", "Webhook URL for alerting")
 	// Bind to env vars
 	_ = viper.BindPFlag("cloud", rootCommand.PersistentFlags().Lookup("cloud"))
 	_ = viper.BindPFlag("timeout", rootCommand.PersistentFlags().Lookup("timeout"))
