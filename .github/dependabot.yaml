@@ -1,0 +1,14 @@
+version: 2
+updates:
+
+  # Watch for any Go dependency updates
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+
+  # Keep our version of Go up to date in the Dockerfile
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
