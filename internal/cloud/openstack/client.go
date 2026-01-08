@@ -63,14 +63,41 @@ func (c *Client) NewClient() error {
 		return fmt.Errorf("authentication failed for profile '%s': %w", c.ProfileName, err)
 	}
 
+	opts := &clientconfig.ClientOpts{
+		Cloud: c.ProfileName,
+	}
+
+	// Parse the cloud config yaml file
+	cloudConfig, err := clientconfig.GetCloudFromYAML(opts)
+	if err != nil {
+		return fmt.Errorf("failed to parse cloud config: %w", err)
+	}
+
+	// Get Endpoint type
+	var availability gophercloud.Availability
+	switch cloudConfig.EndpointType {
+	case "internal":
+		availability = gophercloud.AvailabilityInternal
+	case "admin":
+		availability = gophercloud.AvailabilityAdmin
+	default:
+		availability = gophercloud.AvailabilityPublic
+	}
+
+	// Prepare endpoint options
+	endpointOpts := gophercloud.EndpointOpts{
+		Availability: availability,
+		Region:       cloudConfig.RegionName,
+	}
+
 	// 2. Initialize Block Storage (Cinder) Client
-	blockStorage, err := openstack.NewBlockStorageV3(provider, gophercloud.EndpointOpts{})
+	blockStorage, err := openstack.NewBlockStorageV3(provider, endpointOpts)
 	if err != nil {
 		return fmt.Errorf("failed to initialize Block Storage v3 client: %w", err)
 	}
 
 	// 3. Initialize Compute (Nova) Client
-	compute, err := openstack.NewComputeV2(provider, gophercloud.EndpointOpts{})
+	compute, err := openstack.NewComputeV2(provider, endpointOpts)
 	if err != nil {
 		return fmt.Errorf("failed to initialize Compute v2 client: %w", err)
 	}
