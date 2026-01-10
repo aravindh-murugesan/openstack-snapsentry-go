@@ -52,8 +52,8 @@ func init() {
 	rootCommand.PersistentFlags().IntVar(&timeout, "timeout", 0, "Global execution timeout in seconds (0 = run indefinitely)")
 	rootCommand.PersistentFlags().StringVar(&logLevel, "log-level", "info", "Logging level (debug, info, warn, error)")
 	rootCommand.PersistentFlags().StringVar(&webhookURL, "webhook-url", "", "Webhook URL for alerting")
-	rootCommand.PersistentFlags().StringVar(&webhookUsername, "webhook-username", "", "Webhook URL for alerting")
-	rootCommand.PersistentFlags().StringVar(&webhookPassword, "webhook-password", "", "Webhook URL for alerting")
+	rootCommand.PersistentFlags().StringVar(&webhookUsername, "webhook-username", "", "Webhook username for alerting")
+	rootCommand.PersistentFlags().StringVar(&webhookPassword, "webhook-password", "", "Webhook password for alerting")
 	// Bind to env vars
 	_ = viper.BindPFlag("cloud", rootCommand.PersistentFlags().Lookup("cloud"))
 	_ = viper.BindPFlag("timeout", rootCommand.PersistentFlags().Lookup("timeout"))
