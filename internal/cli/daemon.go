@@ -27,7 +27,8 @@ var daemonCommand = &cobra.Command{
 	GroupID: "snapsentry",
 	Long:    `Starts Snapsentry as a background service that continuously manages snapshot creation and expiry based on configured policies.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println(headerStyle.Render("Snapsentry - Daemon Mode"))
+		banner := fmt.Sprintf("Snapsentry - Daemon Mode \n\nVersion: %s\nBuild Date: %s", SnapsentryVersion, SnapsentryDate)
+		fmt.Println(headerStyle.Render(banner))
 
 		webhookProvider := notifications.Webhook{
 			URL:      webhookURL,
