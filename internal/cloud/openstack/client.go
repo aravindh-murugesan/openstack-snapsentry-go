@@ -22,6 +22,7 @@ type Client struct {
 	// Internal service clients
 	ComputeClient      *gophercloud.ServiceClient
 	BlockStorageClient *gophercloud.ServiceClient
+	IdentityClient     *gophercloud.ServiceClient
 }
 
 // executeWithRetry is a helper to run any operation using the client's retry configuration.
@@ -102,9 +103,16 @@ func (c *Client) NewClient() error {
 		return fmt.Errorf("failed to initialize Compute v2 client: %w", err)
 	}
 
+	// 4. Initialize Identity (Keystone) NewClient
+	identity, err := openstack.NewIdentityV3(provider, endpointOpts)
+	if err != nil {
+		return fmt.Errorf("failed to initialize Identity V3 client: %w", err)
+	}
+
 	// 4. Assign Clients
 	c.BlockStorageClient = blockStorage
 	c.ComputeClient = compute
+	c.IdentityClient = identity
 
 	return nil
 }
