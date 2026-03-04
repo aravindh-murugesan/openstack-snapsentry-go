@@ -48,7 +48,12 @@ func (c *Client) CreateManagedSnapshot(
 		requestID = result.Header.Get("X-Openstack-Request-Id")
 
 		snap, err := result.Extract()
-		createdSnapshot = *snap
+
+		if snap != nil {
+			createdSnapshot = *snap
+		} else {
+			snap = &snapshots.Snapshot{}
+		}
 
 		if err != nil {
 			return fmt.Errorf("Failed to create snapshot %s - %w (Request ID: %s)", snap.ID, err, requestID)
