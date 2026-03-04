@@ -290,6 +290,7 @@ func processVolume(ctx context.Context, client *openstack.Client, vol volumes.Vo
 			policyLogger.Error("Snapshot resource creation failed",
 				"error", err,
 				"request_id", reqID,
+				"snapshot_id", createdSnap.ID,
 			)
 
 			snapFailNotify := notifications.SnapshotCreationFailure{
