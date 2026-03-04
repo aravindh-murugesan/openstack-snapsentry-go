@@ -64,7 +64,7 @@ func (c *Client) CreateManagedSnapshot(
 	}
 
 	if err := c.executeWithRetry(ctx, "CreateVolumeSnapshot", createOperation); err != nil {
-		return snapshots.Snapshot{}, requestID, err
+		return createdSnapshot, requestID, err
 	}
 
 	return createdSnapshot, requestID, nil
