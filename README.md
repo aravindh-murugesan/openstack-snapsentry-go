@@ -20,7 +20,7 @@ A robust, policy and metadata-driven snapshot management tool for OpenStack Cind
 ### Build from Source
 
 ```bash
-git clone [https://github.com/aravindh-murugesan/openstack-snapsentry-go.git](https://github.com/aravindh-murugesan/openstack-snapsentry-go.git)
+git clone https://github.com/aravindh-murugesan/openstack-snapsentry-go.git
 cd openstack-snapsentry-go
 go build -o snapsentry-go cmd/main.go
 ```
