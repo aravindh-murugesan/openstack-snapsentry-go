@@ -48,16 +48,16 @@ func (c *Client) CreateManagedSnapshot(
 		requestID = result.Header.Get("X-Openstack-Request-Id")
 
 		snap, err := result.Extract()
-		if err != nil {
-			return err
-		}
-
 		createdSnapshot = *snap
+
+		if err != nil {
+			return fmt.Errorf("Failed to create snapshot %s - %w (Request ID: %s)", snap.ID, err, requestID)
+		}
 
 		// 2. Wait for Completion
 		// We block here until the snapshot is ready or the context times out.
 		if err := snapshots.WaitForStatus(innerCtx, c.BlockStorageClient, snap.ID, "available"); err != nil {
-			return fmt.Errorf("failed waiting for snapshot %s to become available: %w", snap.ID, err)
+			return fmt.Errorf("failed waiting for snapshot %s to become available: %w (Request ID: %s)", snap.ID, err, requestID)
 		}
 
 		return nil
