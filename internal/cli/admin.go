@@ -31,7 +31,27 @@ var subscribedProjectsCommand = &cobra.Command{
 	},
 }
 
+var orchestratorCommand = &cobra.Command{
+	Use: "orchestrator",
+	Run: func(cmd *cobra.Command, args []string) {
+		webhookProvider := notifications.Webhook{
+			URL:      webhookURL,
+			Username: webhookUsername,
+			Password: webhookPassword,
+		}
+
+		workflow.RunKubeOperatorWorkflow(
+			"snapsentry",
+			cloudProfile,
+			timeout,
+			webhookProvider,
+			logLevel,
+		)
+	},
+}
+
 func init() {
 	adminCommand.AddCommand(subscribedProjectsCommand)
+	adminCommand.AddCommand(orchestratorCommand)
 	rootCommand.AddCommand(adminCommand)
 }

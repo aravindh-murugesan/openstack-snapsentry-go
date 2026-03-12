@@ -58,6 +58,7 @@ func (c *Client) CreateSnapsentryUser(
 ) (users.User, string, error) {
 
 	generatedUserName := fmt.Sprintf("%s-%s", prefix, strings.ToLower(project))
+	fmt.Println(generatedUserName)
 	requestedUser := users.User{}
 	var requestID string
 
@@ -134,7 +135,7 @@ func (c *Client) CreateSnapsentryUser(
 		}
 
 		if requestedRole.ID == "" {
-			fmt.Errorf("Role (%s) does not exist.", requestedRole.Name)
+			return fmt.Errorf("Role (%s) does not exist.", requestedRole.Name)
 		}
 
 		roleAssignRequest := roles.Assign(innerCtx, c.IdentityClient, requestedRole.ID, roles.AssignOpts{

@@ -23,6 +23,9 @@ type Client struct {
 	ComputeClient      *gophercloud.ServiceClient
 	BlockStorageClient *gophercloud.ServiceClient
 	IdentityClient     *gophercloud.ServiceClient
+
+	Region    string
+	Interface string
 }
 
 // executeWithRetry is a helper to run any operation using the client's retry configuration.
@@ -113,6 +116,8 @@ func (c *Client) NewClient() error {
 	c.BlockStorageClient = blockStorage
 	c.ComputeClient = compute
 	c.IdentityClient = identity
+	c.Region = cloudConfig.RegionName
+	c.Interface = cloudConfig.EndpointType
 
 	return nil
 }
