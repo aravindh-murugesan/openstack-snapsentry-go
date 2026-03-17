@@ -8,7 +8,7 @@ require (
 	github.com/go-co-op/gocron/v2 v2.19.1
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/google/uuid v1.6.0
-	github.com/gophercloud/gophercloud/v2 v2.11.0
+	github.com/gophercloud/gophercloud/v2 v2.11.1
 	github.com/gophercloud/utils/v2 v2.0.0-20251121145439-0a38d66a3d88
 	github.com/lmittmann/tint v1.1.3
 	github.com/spf13/cobra v1.10.2
