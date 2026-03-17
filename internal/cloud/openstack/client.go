@@ -2,8 +2,10 @@ package openstack
 
 import (
 	"context"
+	"crypto/tls"
 	"fmt"
 	"log/slog"
+	"net/http"
 
 	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/cloud"
 	"github.com/gophercloud/gophercloud/v2"
@@ -23,6 +25,9 @@ type Client struct {
 	ComputeClient      *gophercloud.ServiceClient
 	BlockStorageClient *gophercloud.ServiceClient
 	IdentityClient     *gophercloud.ServiceClient
+
+	Region    string
+	Interface string
 }
 
 // executeWithRetry is a helper to run any operation using the client's retry configuration.
@@ -41,15 +46,40 @@ func (c *Client) NewClient() error {
 	slog.Debug("Initializing OpenStack client", "profile", c.ProfileName)
 
 	var provider *gophercloud.ProviderClient
+	opts := &clientconfig.ClientOpts{
+		Cloud: c.ProfileName,
+	}
+
+	// Parse the cloud config yaml file
+	cloudConfig, readErr := clientconfig.GetCloudFromYAML(opts)
+	if readErr != nil {
+		return fmt.Errorf("failed to parse cloud config: %w", readErr)
+	}
 
 	// authenticateOperation encapsulates the authentication logic to allow
 	// the retry helper to re-run it in case of transient network issues.
 	authenticateOperation := func(ctx context.Context) error {
-		opts := &clientconfig.ClientOpts{
-			Cloud: c.ProfileName,
+
+		p, err := openstack.NewClient(cloudConfig.AuthInfo.AuthURL)
+		if err != nil {
+			return err
 		}
 
-		p, err := clientconfig.AuthenticatedClient(ctx, opts)
+		if *cloudConfig.Verify == false {
+			tlsconfig := &tls.Config{}
+			tlsconfig.InsecureSkipVerify = true
+			transport := &http.Transport{TLSClientConfig: tlsconfig}
+			p.HTTPClient = http.Client{
+				Transport: transport,
+			}
+		}
+
+		ao, err := clientconfig.AuthOptions(opts)
+		if err != nil {
+			return err
+		}
+
+		err = openstack.Authenticate(ctx, p, *ao)
 		if err != nil {
 			return err
 		}
@@ -62,16 +92,6 @@ func (c *Client) NewClient() error {
 	err := c.executeWithRetry(context.Background(), "OpenStack Authentication", authenticateOperation)
 	if err != nil {
 		return fmt.Errorf("authentication failed for profile '%s': %w", c.ProfileName, err)
-	}
-
-	opts := &clientconfig.ClientOpts{
-		Cloud: c.ProfileName,
-	}
-
-	// Parse the cloud config yaml file
-	cloudConfig, err := clientconfig.GetCloudFromYAML(opts)
-	if err != nil {
-		return fmt.Errorf("failed to parse cloud config: %w", err)
 	}
 
 	// Get Endpoint type
@@ -113,6 +133,8 @@ func (c *Client) NewClient() error {
 	c.BlockStorageClient = blockStorage
 	c.ComputeClient = compute
 	c.IdentityClient = identity
+	c.Region = cloudConfig.RegionName
+	c.Interface = cloudConfig.EndpointType
 
 	return nil
 }
