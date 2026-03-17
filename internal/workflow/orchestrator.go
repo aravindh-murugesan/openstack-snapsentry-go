@@ -10,10 +10,35 @@ import (
 	k8sorchestrator "github.com/aravindh-murugesan/openstack-snapsentry-go/internal/k8s-orchestrator"
 	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/notifications"
 	"github.com/google/uuid"
+	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 )
 
-func RunKubeOperatorWorkflow(namespace string, cloudName string, timeoutSeconds int, notifyProvider notifications.Webhook, logLevel string) error {
+// RunKubeOperatorWorkflow orchestrates the deployment of Snapsentry agents across
+// multiple OpenStack projects.
+//
+// It performs a discovery phase to identify subscribed projects, checks for existing
+// Kubernetes deployments, and for any missing deployments, it automates:
+//  1. The creation of specialized OpenStack service users.
+//  2. The generation of a clouds.yaml configuration stored as a Kubernetes Secret.
+//  3. The rollout of a Snapsentry Deployment in the specified K8s namespace.
+//
+// Returns an error if the initial OpenStack connection or Kubernetes configuration
+// fails, but continues processing other projects if a single project deployment fails.
+func RunKubeOperatorWorkflow(
+	namespace string,
+	cloudName string,
+	timeoutSeconds int,
+	notifyProvider notifications.Webhook,
+	logLevel string,
+	kubeconfig string,
+	incluster bool,
+	requestsCPU string,
+	requestsMem string,
+	limitsCPU string,
+	limitsMem string,
+	snapsentryImage string,
+) error {
 
 	// 1. Initialize Structured Logger
 	// We use slog with tint for colorized, human-readable logs in development/CLI usage.
@@ -53,23 +78,46 @@ func RunKubeOperatorWorkflow(namespace string, cloudName string, timeoutSeconds 
 	}
 	logger.Debug("OpenStack connection established successfully")
 
-	config, err := clientcmd.BuildConfigFromFlags("", "/Users/aravindhmurugesan/Projects/opensource-contributions/openstack-snapsentry-go/kubeconfig.yaml")
-	if err != nil {
-		logger.Error("Failed to connect to kubernetes cluster", "err", err)
-		return fmt.Errorf("failed to connect to kubernetes cluster: %w", err)
+	// 4. Kubernetes Configuration
+	// Determines if the client should use a local kubeconfig file or in-cluster RBAC.
+	var kconfig *rest.Config
+
+	if kubeconfig != "" {
+		config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+		if err != nil {
+			logger.Error("Failed to connect to kubernetes cluster", "err", err)
+			return fmt.Errorf("failed to connect to kubernetes cluster: %w", err)
+		}
+		kconfig = config
 	}
 
+	if incluster {
+		config, err := rest.InClusterConfig()
+		if err != nil {
+			logger.Error("Failed to connect to kubernetes cluster", "err", err)
+			return fmt.Errorf("failed to connect to kubernetes cluster: %w", err)
+		}
+		kconfig = config
+	}
+
+	// 5. Project Discovery
+	// Fetches all projects from OpenStack that have the required metadata/subscription tags.
 	projects, err := ostk.ListSubscribedProjects(ctx)
 	if err != nil {
 		logger.Error("Failed to fetch projects from openstack", "err", err)
 	}
 
 	logger.Info("Discovered openstack projects with snapsentry subscription", "count", len(projects))
+
+	// 6. Reconciliation Loop
+	// Iterates through discovered projects to ensure a Snapsentry instance is running for each.
 	for _, proj := range projects {
 		plogger := logger.With("project_name", proj.Name, "project_id", proj.ID, "project_domain", proj.DomainID)
+
+		// Check for existing deployment to avoid duplicates.
 		plogger.Debug("Processing project for snapsentry manager orchestrator")
 		plogger.Debug("Attempting to fetch the kubernetes deployment for the project")
-		deployments, err := k8sorchestrator.GetSnapsentryDeployment(ctx, config, "snapsentry", proj.ID, proj.Name, proj.DomainID)
+		deployments, err := k8sorchestrator.GetSnapsentryDeployment(ctx, kconfig, namespace, proj.ID, proj.Name, proj.DomainID)
 		if err != nil {
 			plogger.Error("Failed to get deployment from kubernetes", "err", err)
 		}
@@ -80,7 +128,7 @@ func RunKubeOperatorWorkflow(namespace string, cloudName string, timeoutSeconds 
 
 		plogger.Info("Deployment missing for the project. Attempting to deploy snapsentry for the project")
 
-		// Create openstack secrets of the project
+		// Create unique OpenStack credentials for this specific project agent.
 		plogger.Debug("Attempting to create openstack user for the project")
 		password := fmt.Sprintf("snapsentry-%s", uuid.New())
 		user, userReqID, err := ostk.CreateSnapsentryUser(
@@ -100,7 +148,7 @@ func RunKubeOperatorWorkflow(namespace string, cloudName string, timeoutSeconds 
 
 		plogger.Info("Snapsentry user has been created for the project", "user", user.Name)
 
-		// Formualate the secret data
+		// Formulate the clouds.yaml content for the Kubernetes Secret.
 		k8s_secret_data := fmt.Sprintf(`
 clouds:
   snapsentry-%s-%s:
@@ -128,7 +176,8 @@ clouds:
 			ostk.Interface,
 		)
 
-		secret, err := k8sorchestrator.CreateSnapsentrySecret(ctx, config, "snapsentry", proj.ID, proj.Name, proj.DomainID, k8s_secret_data)
+		// Provision the Secret and the Deployment in Kubernetes.
+		secret, err := k8sorchestrator.CreateSnapsentrySecret(ctx, kconfig, namespace, proj.ID, proj.Name, proj.DomainID, k8s_secret_data)
 		if err != nil {
 			plogger.Error("Failed to create kubernetes secret", "err", err)
 			continue
@@ -137,7 +186,9 @@ clouds:
 
 		deployment, err := k8sorchestrator.CreateSnapsentryDeployment(
 			ctx,
-			config, "snapsentry", proj.ID, proj.Name, proj.DomainID,
+			kconfig, namespace, proj.ID, proj.Name, proj.DomainID,
+			requestsCPU, requestsMem, limitsCPU, limitsMem,
+			snapsentryImage, notifyProvider,
 		)
 
 		if err != nil {

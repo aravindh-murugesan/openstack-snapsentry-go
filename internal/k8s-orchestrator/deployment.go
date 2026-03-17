@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/notifications"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
@@ -126,6 +127,12 @@ func CreateSnapsentryDeployment(
 	projectID string,
 	projectName string,
 	domainID string,
+	rCPU string,
+	rMemory string,
+	lCPU string,
+	lMemory string,
+	snapsentryImage string,
+	webhookProvider notifications.Webhook,
 ) (*appsv1.Deployment, error) {
 	clientSet, err := kubernetes.NewForConfig(config)
 	if err != nil {
@@ -141,7 +148,43 @@ func CreateSnapsentryDeployment(
 
 	deploymentClient := clientSet.AppsV1().Deployments(namespace)
 
+	// Some sane defaults for snapsentry
+	if rCPU == "" {
+		rCPU = "64m"
+	}
+	if rMemory == "" {
+		rMemory = "32Mi"
+	}
+	if lCPU == "" {
+		lCPU = "256m"
+	}
+	if lMemory == "" {
+		lMemory = "128Mi"
+	}
+
 	generatedDeploymentName := fmt.Sprintf("snapsentry-%s", projectID)
+	snapsentryRunCommand := []string{
+		"daemon",
+		"--cloud",
+		fmt.Sprintf("snapsentry-%s-%s", projectName, projectID),
+		"--log-level",
+		"info",
+		"--expire-schedule",
+		"0 */1 * * *",
+	}
+
+	if webhookProvider.URL != "" {
+		snapsentryRunCommand = append(snapsentryRunCommand, "--webhook-url", webhookProvider.URL)
+	}
+
+	if webhookProvider.Username != "" {
+		snapsentryRunCommand = append(snapsentryRunCommand, "--webhook-username", webhookProvider.Username)
+	}
+
+	if webhookProvider.Password != "" {
+		snapsentryRunCommand = append(snapsentryRunCommand, "--webhook-password", webhookProvider.Password)
+	}
+
 	snapSentryDeployment := &appsv1.Deployment{
 		TypeMeta: metav1.TypeMeta{
 			APIVersion: "apps/v1",
@@ -168,18 +211,8 @@ func CreateSnapsentryDeployment(
 					Containers: []corev1.Container{
 						{
 							Name:  "snapsentry-go",
-							Image: "ghcr.io/aravindh-murugesan/openstack-snapsentry-go:sha-1261a3d",
-							Args: []string{
-								"daemon",
-								"--cloud",
-								fmt.Sprintf("snapsentry-%s-%s", projectName, projectID),
-								"--log-level",
-								"info",
-								"--webhook-url",
-								"https://zealous-whale-35.webhook.cool",
-								"--expire-schedule",
-								"0 */1 * * *",
-							},
+							Image: snapsentryImage,
+							Args:  snapsentryRunCommand,
 							Env: []corev1.EnvVar{
 								{Name: "GOMAXPROCS", Value: "1"},
 								{Name: "GOMEMLIMIT", Value: "115MiB"},
@@ -187,12 +220,12 @@ func CreateSnapsentryDeployment(
 							ImagePullPolicy: corev1.PullIfNotPresent,
 							Resources: corev1.ResourceRequirements{
 								Limits: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("512m"),
-									corev1.ResourceMemory: resource.MustParse("128Mi"),
+									corev1.ResourceCPU:    resource.MustParse(lCPU),
+									corev1.ResourceMemory: resource.MustParse(lMemory),
 								},
 								Requests: corev1.ResourceList{
-									corev1.ResourceCPU:    resource.MustParse("64m"),
-									corev1.ResourceMemory: resource.MustParse("32Mi"),
+									corev1.ResourceCPU:    resource.MustParse(rCPU),
+									corev1.ResourceMemory: resource.MustParse(rMemory),
 								},
 							},
 							VolumeMounts: []corev1.VolumeMount{
