@@ -162,3 +162,26 @@ Runs continuously and executes tasks based on the provided Cron schedules.
   --create-schedule "*/10 * * * *" \
   --expire-schedule "*/30 * * * *"
 ```
+
+## Orchestrator Mode (Beta)
+
+For large-scale deployments, snapsentry includes an orchestrator command designed for administrators to auto-provision controllers across a Kubernetes cluster. This mode automates the lifecycle of per-project backup controllers.
+
+**How it works:**
+* **Discovery**: Scans for OpenStack projects tagged with `snapsentry-enabled`.
+* **Auto Provisioning**: For every discovered project, the orchestrator generates a dedicated OpenStack Service Account.
+* **Secret Management**: Securely injects `clouds.yaml` data into Kubernetes Secrets.
+* **Deployment**: Spawns a dedicated Kubernetes Deployment (the SnapSentry Controller) for each project to ensure isolation and scalability.
+
+[!Caution]
+This feature is currently in Beta. Note that the orchestrator does not yet support rolling updates for existing deployments (e.g., updating resource limits globally). This functionality is planned for a future release.
+
+```bash
+./snapsentry admin orchestrator --cloud snapsentry-bot \
+  --controller-limit-cpu 256m \
+  --controller-limit-memory 128Mi \
+  --controller-requests-cpu 64m \
+  --controller-requests-memory 32Mi \
+  --workload-snapsentry-image <image-registry/snapsentry:tag> \
+  --kubeconfig ~/.kube/config # Use --incluster if running inside the k8s cluster
+```
