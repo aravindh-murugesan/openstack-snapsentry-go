@@ -13,7 +13,7 @@ require (
 	github.com/lmittmann/tint v1.1.3
 	github.com/spf13/cobra v1.10.2
 	github.com/spf13/viper v1.21.0
-	k8s.io/apimachinery v0.35.2
+	k8s.io/apimachinery v0.35.3
 	k8s.io/client-go v0.35.2
 )
 
