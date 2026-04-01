@@ -4,7 +4,7 @@ kind: Kustomization
 resources:
   - ../../base
 
-namespace: snapsentry-controller
+namespace: snapsentry
 
 patches:
   - target:
@@ -21,6 +21,8 @@ patches:
           - info
           - --cloud
           - snapsentry-orchestartor
+          - --workload-snapsentry-image
+          - ghcr.io/aravindh-murugesan/openstack-snapsentry-go:sha-1c731af
 
 secretGenerator:
   - name: snapsentry-orchestartor-creds
