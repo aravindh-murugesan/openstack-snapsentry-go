@@ -1,0 +1,19 @@
+# This is a template for your clouds.yaml.
+# Please fill in the values as necessary.
+# This is just for reference, you can use any supported clouds.yaml parameters.
+
+clouds:
+  snapsentry-orchestartor:
+    auth:
+      auth_url:
+      username: ""
+      password: ""
+      project_name: ""
+      user_domain_name: ""
+      project_domain_name: ""
+    region_name: ""
+    verify: true
+    interface: public
+    identity_api_version: 3
+    auth_type: password
+    timeout: 10
