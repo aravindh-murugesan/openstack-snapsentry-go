@@ -1,0 +1,39 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: snapsentry-orchestrator
+spec:
+  schedule: "*/10 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          serviceAccountName: snapsentry-orchestrator-sa
+          restartPolicy: OnFailure
+          containers:
+            - name: snapsentry-go
+              image: ghcr.io/aravindh-murugesan/openstack-snapsentry-go:sha-1c731af
+              env:
+                - name: GOMAXPROCS
+                  value: "1"
+                - name: GOMEMLIMIT
+                  value: "115MiB"
+              args: [] # Overridden by overlays
+              resources:
+                requests:
+                  memory: "32Mi"
+                  cpu: "64m"
+                limits:
+                  memory: "128Mi"
+                  cpu: "512m"
+              volumeMounts:
+                - name: openstack-clouds-vol
+                  mountPath: "/etc/openstack"
+                  readOnly: true
+          volumes:
+            - name: openstack-clouds-vol
+              secret:
+                secretName: snapsentry-orchestartor-creds # Kustomize will map this to the hashed name
