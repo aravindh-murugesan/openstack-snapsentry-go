@@ -5,7 +5,7 @@ go 1.25.7
 require (
 	github.com/charmbracelet/lipgloss v1.1.0
 	github.com/go-co-op/gocron-ui v0.3.0
-	github.com/go-co-op/gocron/v2 v2.19.1
+	github.com/go-co-op/gocron/v2 v2.20.0
 	github.com/go-viper/mapstructure/v2 v2.5.0
 	github.com/google/uuid v1.6.0
 	github.com/gophercloud/gophercloud/v2 v2.11.1
