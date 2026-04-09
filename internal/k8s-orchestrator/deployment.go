@@ -62,7 +62,7 @@ func GetSnapsentryDeployment(
 	deploymentClient := clientSet.AppsV1().Deployments(namespace)
 
 	options := metav1.ListOptions{
-		LabelSelector: fmt.Sprintf("app=snapsentry-go,project-id=%s,project-name=%s,domain-id=%s", tenantID, tenantName, domainID),
+		LabelSelector: fmt.Sprintf("app=snapsentry-go,project-id=%s,project-name=%s,domain-id=%s", tenantID, strings.ToLower(tenantName), domainID),
 	}
 
 	snapsentryDeployments, err := deploymentClient.List(
