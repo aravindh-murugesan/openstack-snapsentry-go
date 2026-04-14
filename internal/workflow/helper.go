@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/lmittmann/tint"
+	"golang.org/x/term"
 )
 
 // setupLogger configures the application-wide logger.
@@ -24,9 +25,18 @@ func SetupLogger(level string, cloudName string) *slog.Logger {
 		logLevel = slog.LevelInfo
 	}
 
-	handler := tint.NewHandler(os.Stderr, &tint.Options{
-		Level: logLevel,
-	})
+	var handler slog.Handler
+
+	if term.IsTerminal(int(os.Stdout.Fd())) {
+		handler = tint.NewHandler(os.Stdout, &tint.Options{
+			Level: logLevel,
+		})
+	} else {
+		handler = slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+			Level:     logLevel,
+			AddSource: true,
+		})
+	}
 
 	return slog.New(handler).With("cloud_profile", cloudName)
 }
