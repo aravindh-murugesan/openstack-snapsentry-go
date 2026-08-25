@@ -17,14 +17,14 @@ var expireSnapshotCommand = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println(headerStyle.Render("Snapsentry - Expiry Workflow"))
 		webhookProvider := notifications.Webhook{
-			URL:      webhookURL,
-			Username: webhookUsername,
-			Password: webhookPassword,
+			URL:      rootOpts.WebhookURL,
+			Username: rootOpts.WebhookUsername,
+			Password: rootOpts.WebhookPassword,
 		}
 		return workflow.RunProjectSnapshotExpiryWorkflow(
-			cloudProfile,
-			timeout,
-			logLevel,
+			rootOpts.CloudProfile,
+			rootOpts.Timeout,
+			rootOpts.LogLevel,
 			time.Now().UTC(),
 			webhookProvider,
 		)

@@ -2,31 +2,43 @@ package cli
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
 )
 
-var (
-	cloudProfile, logLevel string
-	timeout                int
-	webhookURL             string
-	webhookUsername        string
-	webhookPassword        string
-)
+type RootOptions struct {
+	CloudProfile    string
+	LogLevel        string
+	Timeout         int
+	WebhookURL      string
+	WebhookUsername string
+	WebhookPassword string
+}
 
 var rootCommand = &cobra.Command{
 	Use:     "snapsentry-go",
 	Aliases: []string{"snapsentry"},
 	PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-		// 1. Allow 'version' (and 'help') to run without the flag
-		if cmd.Name() == "version" || cmd.Name() == "help" {
+		// Automatically bind all flags to viper
+		viper.BindPFlags(cmd.Flags())
+
+		// Sync any values set via Viper (e.g. env vars) back into the Cobra flags,
+		// which automatically updates our structs.
+		cmd.Flags().VisitAll(func(f *pflag.Flag) {
+			if !f.Changed && viper.IsSet(f.Name) {
+				cmd.Flags().Set(f.Name, viper.GetString(f.Name))
+			}
+		})
+
+		// 1. Allow 'help' and any annotated command to run without the cloud flag
+		if cmd.Name() == "help" || cmd.Annotations["skipAuth"] == "true" {
 			return nil
 		}
 
-		// 2. Manually enforce the flag for all other commands
-		// Assuming 'cloudProfile' is the variable bound to your flag
-		if cloudProfile == "" {
+		if rootOpts.CloudProfile == "" {
 			return fmt.Errorf("required flag(s) \"cloud\" not set")
 		}
 
@@ -44,22 +56,22 @@ func Execute() error {
 	return rootCommand.Execute()
 }
 
+var rootOpts *RootOptions = &RootOptions{}
+
 func init() {
 	rootCommand.AddGroup(&cobra.Group{ID: "snapsentry", Title: "Snapsentry"})
 
-	// Global Peristent Flags with env vars support
-	rootCommand.PersistentFlags().StringVar(&cloudProfile, "cloud", "", "Name of the cloud profile as in clouds.yaml (required)")
-	rootCommand.PersistentFlags().IntVar(&timeout, "timeout", 0, "Global execution timeout in seconds (0 = run indefinitely)")
-	rootCommand.PersistentFlags().StringVar(&logLevel, "log-level", "info", "Logging level (debug, info, warn, error)")
-	rootCommand.PersistentFlags().StringVar(&webhookURL, "webhook-url", "", "Webhook URL for alerting")
-	rootCommand.PersistentFlags().StringVar(&webhookUsername, "webhook-username", "", "Webhook username for alerting")
-	rootCommand.PersistentFlags().StringVar(&webhookPassword, "webhook-password", "", "Webhook password for alerting")
-	// Bind to env vars
-	_ = viper.BindPFlag("cloud", rootCommand.PersistentFlags().Lookup("cloud"))
-	_ = viper.BindPFlag("timeout", rootCommand.PersistentFlags().Lookup("timeout"))
-	_ = viper.BindPFlag("log-level", rootCommand.PersistentFlags().Lookup("log_level"))
+	// Global Peristent Flags
+	rootCommand.PersistentFlags().StringVar(&rootOpts.CloudProfile, "cloud", "", "Name of the cloud profile as in clouds.yaml (required)")
+	rootCommand.PersistentFlags().IntVar(&rootOpts.Timeout, "timeout", 0, "Global execution timeout in seconds (0 = run indefinitely)")
+	rootCommand.PersistentFlags().StringVar(&rootOpts.LogLevel, "log-level", "info", "Logging level (debug, info, warn, error)")
+	rootCommand.PersistentFlags().StringVar(&rootOpts.WebhookURL, "webhook-url", "", "Webhook URL for alerting")
+	rootCommand.PersistentFlags().StringVar(&rootOpts.WebhookUsername, "webhook-username", "", "Webhook username for alerting")
+	rootCommand.PersistentFlags().StringVar(&rootOpts.WebhookPassword, "webhook-password", "", "Webhook password for alerting")
 
+	// Set up Viper Environment Variable handling
 	viper.SetEnvPrefix("SNAPSENTRY")
+	// Replace dashes with underscores for bash env vars (e.g., --webhook-url becomes SNAPSENTRY_WEBHOOK_URL)
+	viper.SetEnvKeyReplacer(strings.NewReplacer("-", "_"))
 	viper.AutomaticEnv()
-
 }
