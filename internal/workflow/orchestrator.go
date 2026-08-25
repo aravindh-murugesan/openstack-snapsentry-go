@@ -81,23 +81,28 @@ func RunKubeOperatorWorkflow(
 	// 4. Kubernetes Configuration
 	// Determines if the client should use a local kubeconfig file or in-cluster RBAC.
 	var kconfig *rest.Config
+	var err error
 
 	if kubeconfig != "" {
-		config, err := clientcmd.BuildConfigFromFlags("", kubeconfig)
+		kconfig, err = clientcmd.BuildConfigFromFlags("", kubeconfig)
 		if err != nil {
 			logger.Error("Failed to connect to kubernetes cluster", "err", err)
 			return fmt.Errorf("failed to connect to kubernetes cluster: %w", err)
 		}
-		kconfig = config
+	} else if incluster {
+		kconfig, err = rest.InClusterConfig()
+		if err != nil {
+			logger.Error("Failed to connect to kubernetes cluster", "err", err)
+			return fmt.Errorf("failed to connect to kubernetes cluster: %w", err)
+		}
+	} else {
+		return fmt.Errorf("either kubeconfig or incluster must be specified")
 	}
 
-	if incluster {
-		config, err := rest.InClusterConfig()
-		if err != nil {
-			logger.Error("Failed to connect to kubernetes cluster", "err", err)
-			return fmt.Errorf("failed to connect to kubernetes cluster: %w", err)
-		}
-		kconfig = config
+	k8sOrchestrator, err := k8sorchestrator.NewSnapsentryOrchestrator(kconfig)
+	if err != nil {
+		logger.Error("Failed to initialize k8s orchestrator", "err", err)
+		return fmt.Errorf("failed to initialize k8s orchestrator: %w", err)
 	}
 
 	// 5. Project Discovery
@@ -105,6 +110,7 @@ func RunKubeOperatorWorkflow(
 	projects, err := ostk.ListSubscribedProjects(ctx)
 	if err != nil {
 		logger.Error("Failed to fetch projects from openstack", "err", err)
+		return fmt.Errorf("failed to fetch projects from openstack: %w", err)
 	}
 
 	logger.Info("Discovered openstack projects with snapsentry subscription", "count", len(projects))
@@ -114,10 +120,16 @@ func RunKubeOperatorWorkflow(
 	for _, proj := range projects {
 		plogger := logger.With("project_name", proj.Name, "project_id", proj.ID, "project_domain", proj.DomainID)
 
+		projectInfo := k8sorchestrator.ProjectInfo{
+			ProjectID:   proj.ID,
+			ProjectName: proj.Name,
+			DomainID:    proj.DomainID,
+		}
+
 		// Check for existing deployment to avoid duplicates.
 		plogger.Debug("Processing project for snapsentry manager orchestrator")
 		plogger.Debug("Attempting to fetch the kubernetes deployment for the project")
-		deployments, err := k8sorchestrator.GetSnapsentryDeployment(ctx, kconfig, namespace, proj.ID, proj.Name, proj.DomainID)
+		deployments, err := k8sOrchestrator.ListProjectDeployment(ctx, namespace, projectInfo)
 		if err != nil {
 			plogger.Error("Failed to get deployment from kubernetes", "err", err)
 		}
@@ -149,7 +161,7 @@ func RunKubeOperatorWorkflow(
 		plogger.Info("Snapsentry user has been created for the project", "user", user.Name)
 
 		// Formulate the clouds.yaml content for the Kubernetes Secret.
-		k8s_secret_data := fmt.Sprintf(`
+		k8sSecretData := fmt.Sprintf(`
 clouds:
   snapsentry-%s-%s:
     auth:
@@ -177,26 +189,33 @@ clouds:
 		)
 
 		// Provision the Secret and the Deployment in Kubernetes.
-		secret, err := k8sorchestrator.CreateSnapsentrySecret(ctx, kconfig, namespace, proj.ID, proj.Name, proj.DomainID, k8s_secret_data)
+		secret, err := k8sOrchestrator.CreateOrUpdateCloudsSecret(ctx, namespace, projectInfo, k8sSecretData)
 		if err != nil {
 			plogger.Error("Failed to create kubernetes secret", "err", err)
 			continue
 		}
 		plogger.Info("Successfully created kubernetes secret for the project", "secret_name", secret.Name)
 
-		deployment, err := k8sorchestrator.CreateSnapsentryDeployment(
-			ctx,
-			kconfig, namespace, proj.ID, proj.Name, proj.DomainID,
-			requestsCPU, requestsMem, limitsCPU, limitsMem,
-			snapsentryImage, notifyProvider,
-		)
+		deploymentConfig := k8sorchestrator.DeploymentConfig{
+			Namespace:       namespace,
+			ProjectInfo:     projectInfo,
+			RequestsCPU:     requestsCPU,
+			RequestsMemory:  requestsMem,
+			LimitCPU:        limitsCPU,
+			LimitMemory:     limitsMem,
+			Image:           snapsentryImage,
+			LogLevel:        logLevel,
+			WebhookProvider: notifyProvider,
+			// CreationCron and ExpiryCron are optional.
+		}
 
+		err = k8sOrchestrator.CreateSnapsentryController(ctx, &deploymentConfig)
 		if err != nil {
 			plogger.Error("Failed to create a snapsentry deployment for project", "err", err)
 			continue
 		}
 
-		plogger.Info("Successfully created deployment for snapsentry", "deployment_name", deployment.Name, "namespace", deployment.Namespace)
+		plogger.Info("Successfully created deployment for snapsentry", "namespace", namespace)
 
 	}
 	return nil

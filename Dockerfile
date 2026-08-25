@@ -1,5 +1,5 @@
 # Build the binary
-FROM --platform=$BUILDPLATFORM golang:1.26 AS builder
+FROM --platform=$BUILDPLATFORM golang:1.27 AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
@@ -25,10 +25,10 @@ RUN MODULE=$(go list -m) && \
     COMMIT=$(git rev-parse --short HEAD) && \
     DATE=$(date -u +"%Y-%m-%dT%H:%M:%SZ") && \
     CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -trimpath -ldflags=" \
-        -X '${PKG}.SnapsentryVersion=${VERSION}' \
-        -X '${PKG}.SnapsentryCommit=${COMMIT}' \
-        -X '${PKG}.SnapsentryDate=${DATE}' " \ 
-        -a -o snapsentry-go cmd/main.go
+    -X '${PKG}.SnapsentryVersion=${VERSION}' \
+    -X '${PKG}.SnapsentryCommit=${COMMIT}' \
+    -X '${PKG}.SnapsentryDate=${DATE}' " \ 
+    -a -o snapsentry-go cmd/main.go
 
 # Use distroless as minimal base image to package the binary
 # Refer to https://github.com/GoogleContainerTools/distroless for more details
