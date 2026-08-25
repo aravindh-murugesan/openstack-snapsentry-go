@@ -9,16 +9,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	kubeconfig               string
-	incluster                bool
-	controllerRequestCpu     string
-	controllerRequestMem     string
-	controllerLimitCpu       string
-	controllerLimitMem       string
-	controllerNamespace      string
-	controllerSnasentryImage string
-)
+type AdminOptions struct {
+	Kubeconfig                string
+	Incluster                 bool
+	ControllerRequestCpu      string
+	ControllerRequestMem      string
+	ControllerLimitCpu        string
+	ControllerLimitMem        string
+	ControllerNamespace       string
+	ControllerSnapsentryImage string
+}
+
+var adminOpts = &AdminOptions{}
 
 var adminCommand = &cobra.Command{
 	Use:     "admin",
@@ -31,16 +33,16 @@ var subscribedProjectsCommand = &cobra.Command{
 	Short: "List all the projects with Snapsentry subscription tags. This is only for adminstators for review",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		webhookProvider := notifications.Webhook{
-			URL:      webhookURL,
-			Username: webhookUsername,
-			Password: webhookPassword,
+			URL:      rootOpts.WebhookURL,
+			Username: rootOpts.WebhookUsername,
+			Password: rootOpts.WebhookPassword,
 		}
 
 		return workflow.RunAdminProjectDisoceryWorkflow(
-			cloudProfile,
-			timeout,
+			rootOpts.CloudProfile,
+			rootOpts.Timeout,
 			webhookProvider,
-			logLevel,
+			rootOpts.LogLevel,
 		)
 	},
 }
@@ -48,16 +50,16 @@ var subscribedProjectsCommand = &cobra.Command{
 var orchestratorCommand = &cobra.Command{
 	Use: "orchestrator",
 	PreRunE: func(cmd *cobra.Command, args []string) error {
-		if !incluster && kubeconfig == "" {
+		if !adminOpts.Incluster && adminOpts.Kubeconfig == "" {
 			return fmt.Errorf("Either kubeconfig path or incluster flag has to be provided. Both of them cannot be empty")
 		}
 
-		if incluster && kubeconfig != "" {
+		if adminOpts.Incluster && adminOpts.Kubeconfig != "" {
 			return fmt.Errorf("Either kubeconfig path or incluster flag has to be provider. Both of them cannot be provided at once.")
 		}
 
-		if kubeconfig != "" {
-			_, err := os.Stat(kubeconfig)
+		if adminOpts.Kubeconfig != "" {
+			_, err := os.Stat(adminOpts.Kubeconfig)
 			if err != nil {
 				return fmt.Errorf("Failed to access the kubeconfig file: %w", err)
 			}
@@ -68,24 +70,24 @@ var orchestratorCommand = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 
 		webhookProvider := notifications.Webhook{
-			URL:      webhookURL,
-			Username: webhookUsername,
-			Password: webhookPassword,
+			URL:      rootOpts.WebhookURL,
+			Username: rootOpts.WebhookUsername,
+			Password: rootOpts.WebhookPassword,
 		}
 
 		workflow.RunKubeOperatorWorkflow(
 			"snapsentry",
-			cloudProfile,
-			timeout,
+			rootOpts.CloudProfile,
+			rootOpts.Timeout,
 			webhookProvider,
-			logLevel,
-			kubeconfig,
-			incluster,
-			controllerRequestCpu,
-			controllerRequestMem,
-			controllerLimitCpu,
-			controllerLimitMem,
-			controllerSnasentryImage,
+			rootOpts.LogLevel,
+			adminOpts.Kubeconfig,
+			adminOpts.Incluster,
+			adminOpts.ControllerRequestCpu,
+			adminOpts.ControllerRequestMem,
+			adminOpts.ControllerLimitCpu,
+			adminOpts.ControllerLimitMem,
+			adminOpts.ControllerSnapsentryImage,
 		)
 	},
 }
@@ -93,35 +95,35 @@ var orchestratorCommand = &cobra.Command{
 func init() {
 	// Orcherstrator command flags
 	orchestratorCommand.PersistentFlags().BoolVar(
-		&incluster, "incluster", false,
+		&adminOpts.Incluster, "incluster", false,
 		"Set this flag when you deploy the snapsentry orchestrator in the same kubernetes cluster as your snapsentry controller",
 	)
 	orchestratorCommand.PersistentFlags().StringVar(
-		&kubeconfig, "kubeconfig", "",
+		&adminOpts.Kubeconfig, "kubeconfig", "",
 		"Path to the kubernetes config to connect to a remote cluster",
 	)
 	orchestratorCommand.PersistentFlags().StringVar(
-		&controllerRequestCpu, "controller-requests-cpu", "64m",
+		&adminOpts.ControllerRequestCpu, "controller-requests-cpu", "64m",
 		"CPU Requests for Snapsentry Kubernetes Deployment",
 	)
 	orchestratorCommand.PersistentFlags().StringVar(
-		&controllerRequestMem, "controller-requests-memory", "32Mi",
+		&adminOpts.ControllerRequestMem, "controller-requests-memory", "32Mi",
 		"Memory Requests for Snapsentry Kubernetes Deployment",
 	)
 	orchestratorCommand.PersistentFlags().StringVar(
-		&controllerLimitCpu, "controller-limit-cpu", "256m",
+		&adminOpts.ControllerLimitCpu, "controller-limit-cpu", "256m",
 		"CPU Limits for Snapsentry Kubernetes Deployment",
 	)
 	orchestratorCommand.PersistentFlags().StringVar(
-		&controllerLimitMem, "controller-limit-memory", "128Mi",
+		&adminOpts.ControllerLimitMem, "controller-limit-memory", "128Mi",
 		"CPU Memory for Snapsentry Kubernetes Deployment",
 	)
 	orchestratorCommand.PersistentFlags().StringVar(
-		&controllerNamespace, "controller-namespace", "snapsentry",
+		&adminOpts.ControllerNamespace, "controller-namespace", "snapsentry",
 		"Target namespace for the snapsentry controller",
 	)
 	orchestratorCommand.PersistentFlags().StringVar(
-		&controllerSnasentryImage, "workload-snapsentry-image", "ghcr.io/aravindh-murugesan/openstack-snapsentry-go:sha-5d331af",
+		&adminOpts.ControllerSnapsentryImage, "workload-snapsentry-image", "ghcr.io/aravindh-murugesan/openstack-snapsentry-go:sha-5d331af",
 		"Container Image for the Snapsentry controller",
 	)
 

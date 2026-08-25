@@ -17,16 +17,16 @@ var createSnapshotCommand = &cobra.Command{
 		fmt.Println(headerStyle.Render("Snapsentry - Creation Workflow"))
 
 		webhookProvider := notifications.Webhook{
-			URL:      webhookURL,
-			Username: webhookUsername,
-			Password: webhookPassword,
+			URL:      rootOpts.WebhookURL,
+			Username: rootOpts.WebhookUsername,
+			Password: rootOpts.WebhookPassword,
 		}
 
 		return workflow.RunProjectSnapshotWorkflow(
-			cloudProfile,
-			timeout,
+			rootOpts.CloudProfile,
+			rootOpts.Timeout,
 			webhookProvider,
-			logLevel,
+			rootOpts.LogLevel,
 		)
 	},
 }
