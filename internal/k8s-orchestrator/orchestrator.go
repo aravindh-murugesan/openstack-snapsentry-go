@@ -108,7 +108,9 @@ func (s *SnapsentryOrchestrator) ListProjectDeployment(
 
 	labelSelector := fmt.Sprintf(
 		"app=snapsentry-go,project-id=%s,project-name=%s,domain-id=%s",
-		projectInfo.ProjectID, projectInfo.ProjectName, projectInfo.DomainID,
+		strings.ToLower(projectInfo.ProjectID),
+		strings.ToLower(projectInfo.ProjectName),
+		strings.ToLower(projectInfo.DomainID),
 	)
 	options := metav1.ListOptions{
 		LabelSelector: labelSelector,
