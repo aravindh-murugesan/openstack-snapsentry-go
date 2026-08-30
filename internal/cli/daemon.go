@@ -47,13 +47,12 @@ var daemonCommand = &cobra.Command{
 		banner := lipgloss.JoinVertical(lipgloss.Center, title, body)
 		fmt.Println(banner)
 
-		webhookProvider := notifications.Webhook{
-			URL:      rootOpts.WebhookURL,
-			Username: rootOpts.WebhookUsername,
-			Password: rootOpts.WebhookPassword,
-		}
-
 		dlog := workflow.SetupLogger(rootOpts.LogLevel, rootOpts.CloudProfile).With("component", "daemon")
+
+		nm := notifications.NewNotificationManager(
+			rootOpts.NotificationTargets,
+			dlog,
+		)
 
 		s, err := gocron.NewScheduler()
 		if err != nil {
@@ -73,7 +72,7 @@ var daemonCommand = &cobra.Command{
 			),
 			gocron.NewTask(func() {
 				// A. Run the Workflow
-				workflow.RunProjectSnapshotWorkflow(rootOpts.CloudProfile, rootOpts.Timeout, webhookProvider, rootOpts.LogLevel)
+				workflow.RunProjectSnapshotWorkflow(rootOpts.CloudProfile, rootOpts.Timeout, nm, rootOpts.LogLevel)
 
 				// B. Calculate and Log the Next Run (Post-Execution)
 				if snapshotJob != nil {
@@ -110,7 +109,7 @@ var daemonCommand = &cobra.Command{
 			),
 			gocron.NewTask(func() {
 				// A. Run the Workflow
-				workflow.RunProjectSnapshotExpiryWorkflow(rootOpts.CloudProfile, rootOpts.Timeout, rootOpts.LogLevel, time.Now().UTC(), webhookProvider)
+				workflow.RunProjectSnapshotExpiryWorkflow(rootOpts.CloudProfile, rootOpts.Timeout, rootOpts.LogLevel, time.Now().UTC(), nm)
 
 				// B. Calculate and Log the Next Run (Post-Execution)
 				if expireJob != nil {
