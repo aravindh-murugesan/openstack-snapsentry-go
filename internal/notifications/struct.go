@@ -2,13 +2,6 @@ package notifications
 
 import "github.com/aravindh-murugesan/openstack-snapsentry-go/internal/policy"
 
-type Webhook struct {
-	URL      string
-	Username string
-	Password string
-	Verify   bool
-}
-
 type SnapshotCreationFailure struct {
 	Service    string                      `json:"service"`
 	VMName     string                      `json:"virtual_machine_name"`
