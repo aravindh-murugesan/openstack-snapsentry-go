@@ -61,12 +61,10 @@ func (s *SnapsentryOrchestrator) CreateOrUpdateCloudsSecret(
 	}
 
 	secret := &corev1.Secret{
-		Type: corev1.SecretTypeOpaque,
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: namespace,
-			Labels:    labels,
-		},
+		Type:      corev1.SecretTypeOpaque,
+		Name:      secretName,
+		Namespace: namespace,
+		Labels:    labels,
 		StringData: map[string]string{
 			"clouds.yaml": openstackCloudData,
 		},
@@ -176,28 +174,20 @@ func (s *SnapsentryOrchestrator) CreateSnapsentryController(
 		entryPoint = append(entryPoint, "--expire-schedule", config.ExpiryCron)
 	}
 
-	if config.WebhookProvider.URL != "" {
-		entryPoint = append(entryPoint, "--webhook-url", config.WebhookProvider.URL)
-	}
-
-	if config.WebhookProvider.URL != "" && config.WebhookProvider.Username != "" && config.WebhookProvider.Password != "" {
-		entryPoint = append(
-			entryPoint,
-			"--webhook-username", config.WebhookProvider.Username,
-			"--webhook-password", config.WebhookProvider.Password,
-		)
+	for _, target := range config.NotificationTargets {
+		if target.NotifySuccess {
+			entryPoint = append(entryPoint, "--all-notifier", target.URL)
+		} else {
+			entryPoint = append(entryPoint, "--failure-notifier", target.URL)
+		}
 	}
 
 	snapsentryController := &appsv1.Deployment{
-		TypeMeta: metav1.TypeMeta{
-			APIVersion: "apps/v1",
-			Kind:       "Deployment",
-		},
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      deploymentName,
-			Namespace: config.Namespace,
-			Labels:    labels,
-		},
+		APIVersion: "apps/v1",
+		Kind:       "Deployment",
+		Name:       deploymentName,
+		Namespace:  config.Namespace,
+		Labels:     labels,
 		Spec: appsv1.DeploymentSpec{
 			Replicas: ptr.To(int32(1)),
 			Selector: &metav1.LabelSelector{
@@ -239,11 +229,9 @@ func (s *SnapsentryOrchestrator) CreateSnapsentryController(
 					Volumes: []corev1.Volume{
 						{
 							Name: "openstack-clouds-vol",
-							VolumeSource: corev1.VolumeSource{
-								Secret: &corev1.SecretVolumeSource{
-									SecretName:  fmt.Sprintf("snapsentry-%s", config.ProjectInfo.ProjectID),
-									DefaultMode: ptr.To(int32(0644)),
-								},
+							Secret: &corev1.SecretVolumeSource{
+								SecretName:  fmt.Sprintf("snapsentry-%s", config.ProjectInfo.ProjectID),
+								DefaultMode: ptr.To(int32(0644)),
 							},
 						},
 					},

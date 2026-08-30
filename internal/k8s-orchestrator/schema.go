@@ -14,17 +14,17 @@ type ProjectInfo struct {
 }
 
 type DeploymentConfig struct {
-	Namespace       string
-	ProjectInfo     ProjectInfo
-	RequestsCPU     string
-	RequestsMemory  string
-	LimitCPU        string
-	LimitMemory     string
-	Image           string
-	LogLevel        string
-	WebhookProvider notifications.Webhook
-	CreationCron    string
-	ExpiryCron      string
+	Namespace           string
+	ProjectInfo         ProjectInfo
+	RequestsCPU         string
+	RequestsMemory      string
+	LimitCPU            string
+	LimitMemory         string
+	Image               string
+	LogLevel            string
+	NotificationTargets []notifications.NotificationTarget
+	CreationCron        string
+	ExpiryCron          string
 }
 
 func (d *DeploymentConfig) Validate() error {

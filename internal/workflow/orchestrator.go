@@ -29,7 +29,7 @@ func RunKubeOperatorWorkflow(
 	namespace string,
 	cloudName string,
 	timeoutSeconds int,
-	notifyProvider notifications.Webhook,
+	notificationTargets []notifications.NotificationTarget,
 	logLevel string,
 	kubeconfig string,
 	incluster bool,
@@ -205,7 +205,7 @@ clouds:
 			LimitMemory:     limitsMem,
 			Image:           snapsentryImage,
 			LogLevel:        logLevel,
-			WebhookProvider: notifyProvider,
+			NotificationTargets: notificationTargets,
 			// CreationCron and ExpiryCron are optional.
 		}
 
