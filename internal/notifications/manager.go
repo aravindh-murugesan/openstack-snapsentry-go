@@ -2,7 +2,10 @@ package notifications
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
+	stdhttp "net/http"
+	"strings"
 
 	"github.com/nikoksr/notify"
 	"github.com/nikoksr/notify/service/http"
@@ -55,10 +58,39 @@ func NewNotificationManager(targets []NotificationTarget, logger *slog.Logger) *
 			logger.Warn("Skipping invalid notification URL", "url", target.URL, "error", err)
 			continue
 		}
-		if target.NotifySuccess {
-			allHooks.AddReceiversURLs(target.URL)
+		wh := &http.Webhook{
+			ContentType: "application/json; charset=utf-8",
+			Header:      stdhttp.Header{},
+			Method:      stdhttp.MethodPost,
+			URL:         target.URL,
+		}
+
+		if strings.Contains(target.URL, "discord.com/api/webhooks") {
+			wh.BuildPayload = func(subject, message string) any {
+				return map[string]string{
+					"content": fmt.Sprintf("**%s**\n```json\n%s\n```", subject, message),
+				}
+			}
+		} else if strings.Contains(target.URL, "hooks.slack.com/services") {
+			wh.BuildPayload = func(subject, message string) any {
+				return map[string]string{
+					"text": fmt.Sprintf("*%s*\n```\n%s\n```", subject, message),
+				}
+			}
 		} else {
-			failureHooks.AddReceiversURLs(target.URL)
+			wh.BuildPayload = func(subject, message string) any {
+				// The default payload format for nikoksr/notify HTTP service
+				return map[string]string{
+					"subject": subject,
+					"message": message,
+				}
+			}
+		}
+
+		if target.NotifySuccess {
+			allHooks.AddReceivers(wh)
+		} else {
+			failureHooks.AddReceivers(wh)
 		}
 	}
 
