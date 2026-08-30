@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/notifications"
@@ -16,17 +17,16 @@ var expireSnapshotCommand = &cobra.Command{
 	Long:    `Scans all managed snapshots in the project, compares their stored expiry dates against the current UTC time, and permanently deletes those that have exceeded their retention period.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println(headerStyle.Render("Snapsentry - Expiry Workflow"))
-		webhookProvider := notifications.Webhook{
-			URL:      rootOpts.WebhookURL,
-			Username: rootOpts.WebhookUsername,
-			Password: rootOpts.WebhookPassword,
-		}
+		nm := notifications.NewNotificationManager(
+			rootOpts.NotificationTargets,
+			&slog.Logger{},
+		)
 		return workflow.RunProjectSnapshotExpiryWorkflow(
 			rootOpts.CloudProfile,
 			rootOpts.Timeout,
 			rootOpts.LogLevel,
 			time.Now().UTC(),
-			webhookProvider,
+			nm,
 		)
 	},
 }

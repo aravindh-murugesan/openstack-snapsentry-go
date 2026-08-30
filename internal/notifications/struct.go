@@ -28,3 +28,10 @@ type SnapshotExpiryFailure struct {
 	SnapshotMetadata policy.SnapshotMetadata `json:"snapshot_metadata"`
 	Message          string                  `json:"message"`
 }
+
+type SnapshotExpirySuccess struct {
+	Service          string                  `json:"service"`
+	SnapshotID       string                  `json:"snapshot_id"`
+	VolumeID         string                  `json:"volume_id"`
+	SnapshotMetadata policy.SnapshotMetadata `json:"snapshot_metadata"`
+}
