@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -30,10 +31,11 @@ import (
 //   - cloudName: The profile name from `clouds.yaml`.
 //   - timeoutSeconds: Hard limit for the job duration.
 
-func RunProjectSnapshotWorkflow(cloudName string, timeoutSeconds int, notifyProvider notifications.Webhook, logLevel string) error {
+func RunProjectSnapshotWorkflow(cloudName string, timeoutSeconds int, notifier *notifications.NotificationManager, logLevel string) error {
 	// 1. Initialize Structured Logger
 	// We use slog with tint for colorized, human-readable logs in development/CLI usage.
 	logger := SetupLogger(logLevel, cloudName)
+	notifier.Logger = logger
 
 	snapsentryRunID := fmt.Sprintf("req-%s", uuid.New().String())
 	logger = logger.With("snapsentry_id", snapsentryRunID)
@@ -90,17 +92,17 @@ func RunProjectSnapshotWorkflow(cloudName string, timeoutSeconds int, notifyProv
 	logger.Debug("Starting to process single-attached volumes", "vm_count", len(groupedVolumes.Attached))
 	for vm, vols := range groupedVolumes.Attached {
 		logger.Debug("Starting to process volumes attached to a VM", "vm_id", vm, "volume_count", len(vols))
-		processVolumeGroup(ctx, &ostk, vols, &successCount, &errorCount, notifyProvider, logger)
+		processVolumeGroup(ctx, &ostk, vols, &successCount, &errorCount, notifier, logger)
 	}
 
 	logger.Debug("Starting to process multi-attached volumes", "count", len(groupedVolumes.MultiAttached))
 	for _, vol := range groupedVolumes.MultiAttached {
-		processVolumeGroup(ctx, &ostk, []volumes.Volume{vol}, &successCount, &errorCount, notifyProvider, logger)
+		processVolumeGroup(ctx, &ostk, []volumes.Volume{vol}, &successCount, &errorCount, notifier, logger)
 	}
 
 	logger.Debug("Starting to process unattached volumes", "count", len(groupedVolumes.Unattached))
 	for _, vol := range groupedVolumes.Unattached {
-		processVolumeGroup(ctx, &ostk, []volumes.Volume{vol}, &successCount, &errorCount, notifyProvider, logger)
+		processVolumeGroup(ctx, &ostk, []volumes.Volume{vol}, &successCount, &errorCount, notifier, logger)
 	}
 
 	logger.Info("Snapshot workflow execution summary for evaluation. This only refers to snapsentry processing and excludes openstack api errors",
@@ -131,7 +133,7 @@ func processVolumeGroup(
 	vols []volumes.Volume,
 	successCounter *int32,
 	errorCounter *int32,
-	notifyProvider notifications.Webhook,
+	notifier *notifications.NotificationManager,
 	logger *slog.Logger,
 ) {
 
@@ -161,7 +163,7 @@ func processVolumeGroup(
 			volLogger.Debug("Starting processing for volume")
 
 			// Execute the core logic (policy checks, snapshot creation, etc.)
-			if err := processVolume(ctx, client, vol, notifyProvider, volLogger); err != nil {
+			if err := processVolume(ctx, client, vol, notifier, volLogger); err != nil {
 				volLogger.Error("Volume processing encountered an error", "error", err)
 				// Atomic increment is required because multiple goroutines write to this address simultaneously.
 				atomic.AddInt32(errorCounter, 1)
@@ -186,7 +188,7 @@ func processVolumeGroup(
 //  4. Execution: Triggers the snapshot creation if the window is open and unsatisfied.
 //  5. Auditing: Writes detailed logs (Skipped/Created/Failed) to the database.
 //  6. Cleanup: Detects and deletes "zombie" snapshots if creation reports failure but leaves an ID behind.
-func processVolume(ctx context.Context, client *openstack.Client, vol volumes.Volume, notifyProvider notifications.Webhook, logger *slog.Logger) error {
+func processVolume(ctx context.Context, client *openstack.Client, vol volumes.Volume, notifier *notifications.NotificationManager, logger *slog.Logger) error {
 
 	var execErrors error
 	// Define the order of policy evaluation.
@@ -283,6 +285,27 @@ func processVolume(ctx context.Context, client *openstack.Client, vol volumes.Vo
 				"snapshot_id", createdSnap.ID,
 				"request_id", reqID,
 			)
+
+			if notifier != nil {
+				successNotify := notifications.SnapshotCreationSuccess{
+					Service:    "snapsentry",
+					VolumeID:   vol.ID,
+					SnapshotID: createdSnap.ID,
+					Window:     result.Window,
+				}
+				jsonBytes, err := json.Marshal(successNotify)
+				if err != nil {
+					policyLogger.Error("Failed to marshal success notification payload", "error", err)
+				} else {
+					policyLogger.Debug("Attempting to dispatch success notification")
+					notifier.Dispatch(
+						ctx, notifications.EventTypeSuccess,
+						fmt.Sprintf("Snapshot Creation Success: %s", vol.ID),
+						string(jsonBytes),
+					)
+				}
+			}
+
 			continue
 		} else {
 			// Failure path
@@ -331,16 +354,21 @@ func processVolume(ctx context.Context, client *openstack.Client, vol volumes.Vo
 				}
 			}
 
-			if notifyProvider.URL != "" {
-				policyLogger.Debug("Attempting to notify via configured webhook", "provider", notifyProvider.URL)
-				err := notifyProvider.Notify(snapFailNotify)
+			if notifier != nil {
+				jsonBytes, err := json.Marshal(snapFailNotify)
 				if err != nil {
-					policyLogger.Error("Notification failed to send", "webhook", notifyProvider.URL, "err", err)
+					policyLogger.Error("Failed to marshal notification payload", "error", err)
 				} else {
-					policyLogger.Info("Notification sent for the snapshot failure", "webhook", notifyProvider.URL)
+					policyLogger.Debug("Attempting to dispatch failure notification")
+					notifier.Dispatch(
+						ctx, notifications.EventTypeFailure,
+						fmt.Sprintf("Snapshot Creation Failed: %s", vol.ID),
+						string(jsonBytes),
+					)
 				}
+
 			} else {
-				policyLogger.Debug("Skip notification", "reason", "No webhook provider is configured by the user")
+				policyLogger.Debug("Skip notification", "reason", "No notification manager configured")
 			}
 		}
 	}

@@ -12,6 +12,15 @@ type SnapshotCreationFailure struct {
 	Window     policy.SnapshotPolicyWindow `json:"snapshot_window"`
 }
 
+type SnapshotCreationSuccess struct {
+	Service    string                      `json:"service"`
+	VMName     string                      `json:"virtual_machine_name,omitempty"`
+	VMID       string                      `json:"virtual_machine_id,omitempty"`
+	VolumeID   string                      `json:"volume_id"`
+	SnapshotID string                      `json:"snapshot_id"`
+	Window     policy.SnapshotPolicyWindow `json:"snapshot_window"`
+}
+
 type SnapshotExpiryFailure struct {
 	Service          string                  `json:"service"`
 	SnapshotID       string                  `json:"snapshot_id"`
