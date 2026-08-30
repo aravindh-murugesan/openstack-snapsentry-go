@@ -12,7 +12,6 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
-	"k8s.io/utils/ptr"
 )
 
 type SnapsentryOrchestrator struct {
@@ -189,7 +188,7 @@ func (s *SnapsentryOrchestrator) CreateSnapsentryController(
 		Namespace:  config.Namespace,
 		Labels:     labels,
 		Spec: appsv1.DeploymentSpec{
-			Replicas: ptr.To(int32(1)),
+			Replicas: new(int32(1)),
 			Selector: &metav1.LabelSelector{
 				MatchLabels: labels,
 			},
@@ -231,7 +230,7 @@ func (s *SnapsentryOrchestrator) CreateSnapsentryController(
 							Name: "openstack-clouds-vol",
 							Secret: &corev1.SecretVolumeSource{
 								SecretName:  fmt.Sprintf("snapsentry-%s", config.ProjectInfo.ProjectID),
-								DefaultMode: ptr.To(int32(0644)),
+								DefaultMode: new(int32(0644)),
 							},
 						},
 					},
