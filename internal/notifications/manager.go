@@ -22,16 +22,25 @@ type NotificationManager struct {
 }
 
 func (nm *NotificationManager) Dispatch(
-	ctx context.Context, eventType EventType, message string,
+	ctx context.Context,
+	eventType EventType,
+	subject string,
+	message string,
 ) {
 	switch eventType {
 	case EventTypeSuccess:
 		nm.Logger.Debug("Notification Type: Success", slog.String("message", message))
-		nm.AllNotifier.Send(ctx, "", message)
+		if err := nm.AllNotifier.Send(ctx, subject, message); err != nil {
+			nm.Logger.Error("Failed to send success notification", slog.String("error", err.Error()))
+		}
 	case EventTypeFailure:
 		nm.Logger.Error("Notification Type: Failure", slog.String("message", message))
-		nm.FailureNotifier.Send(ctx, "", message)
-		nm.AllNotifier.Send(ctx, "", message)
+		if err := nm.FailureNotifier.Send(ctx, subject, message); err != nil {
+			nm.Logger.Error("Failed to send failure notification", slog.String("error", err.Error()))
+		}
+		if err := nm.AllNotifier.Send(ctx, subject, message); err != nil {
+			nm.Logger.Error("Failed to send failure notification", slog.String("error", err.Error()))
+		}
 	default:
 		nm.Logger.Error("Unknown event type", slog.String("event_type", string(eventType)), slog.String("message", message))
 	}
