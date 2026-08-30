@@ -35,11 +35,11 @@ func RunProjectSnapshotWorkflow(cloudName string, timeoutSeconds int, notifier *
 	// 1. Initialize Structured Logger
 	// We use slog with tint for colorized, human-readable logs in development/CLI usage.
 	logger := SetupLogger(logLevel, cloudName)
-	notifier.Logger = logger
 
 	snapsentryRunID := fmt.Sprintf("req-%s", uuid.New().String())
 	logger = logger.With("snapsentry_id", snapsentryRunID)
 	logger.Info("Initializing snapshot lifecycle workflow")
+	notifier.Logger = logger
 
 	// 2. Setup Context (Optional Timeout)
 	// This ensures the job doesn't hang indefinitely if the API becomes unresponsive.
