@@ -9,20 +9,15 @@ import (
 	"github.com/gophercloud/gophercloud/v2/openstack/identity/v3/users"
 )
 
-func (c *Client) ListSnapsentryUsers(ctx context.Context, prefix string) ([]users.User, error) {
-
-	if prefix == "" {
-		prefix = "snapsentry-"
-	}
+func (c *Client) ListSnapsentryUsers(ctx context.Context, domainId string, username string) ([]users.User, error) {
 
 	userListResult := []users.User{}
 
 	listOP := func(innerCtx context.Context) error {
 
 		opts := users.ListOpts{
-			Filters: map[string]string{
-				"name__contains": prefix,
-			},
+			DomainID: domainId,
+			Name:     username,
 		}
 
 		resp, err := users.List(c.IdentityClient, opts).AllPages(innerCtx)
@@ -72,7 +67,7 @@ func (c *Client) CreateSnapsentryUser(
 
 	createOP := func(innerCtx context.Context) error {
 		// Check if the user exists. Gopher SDK does not provide us option to get by name.
-		existingUsers, err := c.ListSnapsentryUsers(innerCtx, prefix)
+		existingUsers, err := c.ListSnapsentryUsers(innerCtx, domainId, generatedUserName)
 		if err != nil {
 			return err
 		}
