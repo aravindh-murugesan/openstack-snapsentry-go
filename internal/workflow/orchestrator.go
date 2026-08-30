@@ -29,7 +29,7 @@ func RunKubeOperatorWorkflow(
 	namespace string,
 	cloudName string,
 	timeoutSeconds int,
-	notifyProvider notifications.Webhook,
+	notificationTargets []notifications.NotificationTarget,
 	logLevel string,
 	kubeconfig string,
 	incluster bool,
@@ -197,15 +197,15 @@ clouds:
 		plogger.Info("Successfully created kubernetes secret for the project", "secret_name", secret.Name)
 
 		deploymentConfig := k8sorchestrator.DeploymentConfig{
-			Namespace:       namespace,
-			ProjectInfo:     projectInfo,
-			RequestsCPU:     requestsCPU,
-			RequestsMemory:  requestsMem,
-			LimitCPU:        limitsCPU,
-			LimitMemory:     limitsMem,
-			Image:           snapsentryImage,
-			LogLevel:        logLevel,
-			WebhookProvider: notifyProvider,
+			Namespace:           namespace,
+			ProjectInfo:         projectInfo,
+			RequestsCPU:         requestsCPU,
+			RequestsMemory:      requestsMem,
+			LimitCPU:            limitsCPU,
+			LimitMemory:         limitsMem,
+			Image:               snapsentryImage,
+			LogLevel:            logLevel,
+			NotificationTargets: notificationTargets,
 			// CreationCron and ExpiryCron are optional.
 		}
 

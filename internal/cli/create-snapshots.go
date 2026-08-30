@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/notifications"
 	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/workflow"
@@ -16,16 +17,15 @@ var createSnapshotCommand = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		fmt.Println(headerStyle.Render("Snapsentry - Creation Workflow"))
 
-		webhookProvider := notifications.Webhook{
-			URL:      rootOpts.WebhookURL,
-			Username: rootOpts.WebhookUsername,
-			Password: rootOpts.WebhookPassword,
-		}
+		nm := notifications.NewNotificationManager(
+			rootOpts.NotificationTargets,
+			&slog.Logger{},
+		)
 
 		return workflow.RunProjectSnapshotWorkflow(
 			rootOpts.CloudProfile,
 			rootOpts.Timeout,
-			webhookProvider,
+			nm,
 			rootOpts.LogLevel,
 		)
 	},

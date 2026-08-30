@@ -14,7 +14,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func RunAdminProjectDisoceryWorkflow(cloudName string, timeoutSeconds int, notifyProvider notifications.Webhook, logLevel string) error {
+func RunAdminProjectDisoceryWorkflow(cloudName string, timeoutSeconds int, notificationTargets []notifications.NotificationTarget, logLevel string) error {
 	// 1. Initialize Structured Logger
 	// We use slog with tint for colorized, human-readable logs in development/CLI usage.
 	logger := SetupLogger(logLevel, cloudName)

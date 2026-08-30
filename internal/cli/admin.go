@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 
-	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/notifications"
 	"github.com/aravindh-murugesan/openstack-snapsentry-go/internal/workflow"
 	"github.com/spf13/cobra"
 )
@@ -32,16 +31,10 @@ var subscribedProjectsCommand = &cobra.Command{
 	Use:   "list-subscribed-projects",
 	Short: "List all the projects with Snapsentry subscription tags. This is only for adminstators for review",
 	RunE: func(cmd *cobra.Command, args []string) error {
-		webhookProvider := notifications.Webhook{
-			URL:      rootOpts.WebhookURL,
-			Username: rootOpts.WebhookUsername,
-			Password: rootOpts.WebhookPassword,
-		}
-
 		return workflow.RunAdminProjectDisoceryWorkflow(
 			rootOpts.CloudProfile,
 			rootOpts.Timeout,
-			webhookProvider,
+			rootOpts.NotificationTargets,
 			rootOpts.LogLevel,
 		)
 	},
@@ -69,17 +62,11 @@ var orchestratorCommand = &cobra.Command{
 	},
 	Run: func(cmd *cobra.Command, args []string) {
 
-		webhookProvider := notifications.Webhook{
-			URL:      rootOpts.WebhookURL,
-			Username: rootOpts.WebhookUsername,
-			Password: rootOpts.WebhookPassword,
-		}
-
 		workflow.RunKubeOperatorWorkflow(
 			"snapsentry",
 			rootOpts.CloudProfile,
 			rootOpts.Timeout,
-			webhookProvider,
+			rootOpts.NotificationTargets,
 			rootOpts.LogLevel,
 			adminOpts.Kubeconfig,
 			adminOpts.Incluster,

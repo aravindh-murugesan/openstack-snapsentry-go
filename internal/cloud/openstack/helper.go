@@ -18,10 +18,9 @@ import (
 // It specifically checks for standard HTTP 429/5xx codes from Gophercloud
 // and assumes other unknown network errors are also retryable.
 func isRetryable(err error) bool {
-	var gopherErrors gophercloud.ErrUnexpectedResponseCode
 
 	// Unwrap the error to see if it's a specific Gophercloud HTTP response error
-	if errors.As(err, &gopherErrors) {
+	if gopherErrors, ok := errors.AsType[gophercloud.ErrUnexpectedResponseCode](err); ok {
 		switch gopherErrors.Actual {
 		case http.StatusTooManyRequests, // 429 - Rate Limiting
 			http.StatusRequestTimeout,      // 408 - Client Timeout

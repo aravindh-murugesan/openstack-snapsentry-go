@@ -111,8 +111,8 @@ func SubscribeVolumeMonthly(cloudName, logLevel, volID string, enabled bool, ret
 
 // applySubscription handles the actual API call to update the volume metadata.
 func applySubscription(cloudName, logLevel, volID string, metadata map[string]string, logger interface {
-	Info(string, ...interface{})
-	Error(string, ...interface{})
+	Info(string, ...any)
+	Error(string, ...any)
 }) error {
 	client, err := initClient(cloudName, logLevel)
 	if err != nil {

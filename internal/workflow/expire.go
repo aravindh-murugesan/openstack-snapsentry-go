@@ -2,6 +2,7 @@ package workflow
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log/slog"
 	"time"
@@ -24,11 +25,12 @@ import (
 //
 // Parameters:
 //   - now: The reference time for expiry (usually time.Now(), but injected for deterministic testing. UTC).
-func RunProjectSnapshotExpiryWorkflow(cloudName string, timeoutSeconds int, logLevel string, now time.Time, notifyProvider notifications.Webhook) error {
+func RunProjectSnapshotExpiryWorkflow(cloudName string, timeoutSeconds int, logLevel string, now time.Time, notifier *notifications.NotificationManager) error {
 	// 1. Setup Logger & Context
 	logger := SetupLogger(logLevel, cloudName).With("workflow", "expiry", "validation_time", now)
 	snapsentryRunID := fmt.Sprintf("req-%s", uuid.New().String())
 	logger = logger.With("snapsentry_id", snapsentryRunID)
+	notifier.Logger = logger
 
 	logger.Info("Initializing snapshot lifecycle workflow - expiry")
 
@@ -76,7 +78,7 @@ func RunProjectSnapshotExpiryWorkflow(cloudName string, timeoutSeconds int, logL
 			return ctx.Err()
 		}
 
-		processSnapshotExpiry(ctx, ostk, snap, now, notifyProvider, logger)
+		processSnapshotExpiry(ctx, ostk, snap, now, notifier, logger)
 	}
 
 	logger.Info("Expiry workflow completed")
@@ -84,7 +86,7 @@ func RunProjectSnapshotExpiryWorkflow(cloudName string, timeoutSeconds int, logL
 }
 
 // processSnapshotExpiry handles the logic for a single snapshot
-func processSnapshotExpiry(ctx context.Context, client openstack.Client, snap snapshots.Snapshot, now time.Time, notifyProvider notifications.Webhook, logger *slog.Logger) {
+func processSnapshotExpiry(ctx context.Context, client openstack.Client, snap snapshots.Snapshot, now time.Time, notifier *notifications.NotificationManager, logger *slog.Logger) {
 	snapLog := logger.With("snapshot_id", snap.ID, "volume_id", snap.VolumeID)
 
 	// A. Parse Metadata
@@ -106,20 +108,51 @@ func processSnapshotExpiry(ctx context.Context, client openstack.Client, snap sn
 	reqID, err := client.DeleteSnapshot(ctx, snap.ID)
 	if err != nil {
 		snapLog.Error("Failed to delete snapshot", "error", err, "request_id", reqID, "expires_at", meta.ExpiryDate)
-		if notifyProvider.URL != "" {
-			metadata := *meta
+		if notifier != nil {
 			snapDelFailNotify := notifications.SnapshotExpiryFailure{
 				Service:          "snapsentry",
 				SnapshotID:       snap.ID,
 				VolumeID:         snap.VolumeID,
-				SnapshotMetadata: metadata,
+				SnapshotMetadata: *meta,
 				Message:          fmt.Sprintf("Failed to delete snapshot due to %s", err),
 			}
-			notifyProvider.Notify(snapDelFailNotify)
+			jsonBytes, err := json.Marshal(snapDelFailNotify)
+			if err != nil {
+				snapLog.Error("Failed to marshal expiry failure notification payload", "error", err)
+			} else {
+				snapLog.Debug("Attempting to dispatch failure notification")
+				notifier.Dispatch(
+					ctx, notifications.EventTypeFailure,
+					fmt.Sprintf("Snapshot Expiry Failed: %s", snap.ID),
+					string(jsonBytes),
+				)
+			}
+		} else {
+			snapLog.Debug("Skip notification", "reason", "No notification manager configured")
 		}
 		return
 	}
 
 	// D. Success
 	snapLog.Info("Snapshot deleted successfully", "request_id", reqID, "expires_at", meta.ExpiryDate)
+
+	if notifier != nil {
+		successNotify := notifications.SnapshotExpirySuccess{
+			Service:          "snapsentry",
+			SnapshotID:       snap.ID,
+			VolumeID:         snap.VolumeID,
+			SnapshotMetadata: *meta,
+		}
+		jsonBytes, err := json.Marshal(successNotify)
+		if err != nil {
+			snapLog.Error("Failed to marshal expiry success notification payload", "error", err)
+		} else {
+			snapLog.Debug("Attempting to dispatch success notification")
+			notifier.Dispatch(
+				ctx, notifications.EventTypeSuccess,
+				fmt.Sprintf("Snapshot Expiry Success: %s", snap.ID),
+				string(jsonBytes),
+			)
+		}
+	}
 }
