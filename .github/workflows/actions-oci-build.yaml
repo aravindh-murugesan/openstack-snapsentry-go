@@ -1,5 +1,8 @@
 name: Build OCI Image
 on:
+  push:
+    tags:
+      - "v*"
   workflow_dispatch:
 
 env:
@@ -38,8 +41,17 @@ jobs:
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
           tags: |
-            type=raw,value=test-build
-            type=sha,prefix=sha-
+            type=semver.pattern={{version}}
+            type=semver.pattern={{major}}.{{minor}}
+            type=semver.pattern={{major}}
+            type=raw,prefix=sha-
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
+          labels:
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.created=${{ steps.meta.outputs.created }}
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.version=${{ steps.meta.outputs.version }}
+            org.opencontainers.image.application="Snapsentry Go"
 
       - name: Build and push Docker image
         uses: docker/build-push-action@d08e5c354a6adb9ed34480a06d141179aa583294 # v5
@@ -49,3 +61,5 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           platforms: linux/amd64,linux/arm64
+          sbom: true
+          provenance: true
