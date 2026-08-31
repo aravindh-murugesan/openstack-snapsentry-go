@@ -44,9 +44,9 @@ jobs:
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}
             type=semver,pattern={{major}}
-            type=raw,prefix=sha-
+            type=sha,prefix=sha-
             type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', 'main') }}
-          labels:
+          labels: |
             org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
             org.opencontainers.image.created=${{ steps.meta.outputs.created }}
             org.opencontainers.image.revision=${{ github.sha }}
